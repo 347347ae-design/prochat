@@ -1,8 +1,8 @@
 {
-  "versionCode": 10,
-  "versionName": "1.2.6",
-  "notes": "修「更新提示不及时」：启动就检查更新，从后台切回来也会再查；检查失败不再锁一整天，下次打开自动重试；点过「稍后」的版本 3 天后会再提醒。\n设置里的「检查更新」发现有新版会直接高亮成「有新版本 x.x.x，查看」。\n全新安装不再弹「更新公告」，只有从旧版本升上来才显示。",
-  "url": "https://ai.h80b5c8fe.nyat.app:21398/prochat/ProChat-1.2.6.apk",
+  "versionCode": 11,
+  "versionName": "1.2.7",
+  "notes": "新增联网搜索开关：输入框左边的地球图标，点一下变蓝就是开着。\n只对自带联网能力的服务商生效：智谱 GLM、Kimi、OpenRouter、通义千问；其他服务商不会发送任何联网参数。\n回答下面会标一个「联网」，一眼看出这条回复查过网。\n网页版同步更新，iPhone 刷新页面即可。",
+  "url": "https://ai.h80b5c8fe.nyat.app:21398/prochat/ProChat-1.2.7.apk",
   "force": false,
-  "publishedAt": "2026-10-26T16:09:34.246Z"
+  "publishedAt": "2026-10-27T00:40:00.000Z"
 }

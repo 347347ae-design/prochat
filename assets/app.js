@@ -200,6 +200,7 @@
     contextLimit: 20,
     temperature: 0.7,
     maxTokens: 0,
+    webSearch: false,
     voiceLang: 'zh-CN',
     voiceMode: 'api',
     voiceModel: '',
@@ -647,6 +648,7 @@
 
   function metaHtml(msg, streaming) {
     const parts = [];
+    if (msg.web) parts.push('联网');
     if (msg.model) parts.push(msg.model);
     if (msg.ms) parts.push((msg.ms / 1000).toFixed(1) + 's');
     if (msg.tokens) parts.push(msg.tokens + ' tokens');
@@ -716,6 +718,7 @@
     $('#hint').textContent = cfg
       ? ('温度 ' + S.settings.temperature + ' · 上下文 ' + S.settings.contextLimit + ' 条 · ' + cfg.model)
       : '还没有模型服务，去设置里加一个';
+    updateWebBtn();
   }
 
   /* ------------------------------------------------------------ 发送 */
@@ -735,6 +738,84 @@
     $('#btnSend').classList.toggle('hidden', busy);
     $('#btnStop').classList.toggle('hidden', !busy);
     $('#btnSend').disabled = busy;
+  }
+
+  function updateWebBtn() {
+    const b = $('#btnWeb');
+    if (!b) return;
+    const on = !!S.settings.webSearch;
+    const cfg = activeConfig();
+    const spec = cfg ? webSearchSpec(cfg.baseUrl) : null;
+    b.classList.toggle('on', on);
+    b.classList.toggle('unsupported', on && !spec);
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    b.title = !on ? '联网搜索：关'
+      : (spec ? '联网搜索：开（' + spec.name + '）' : '联网搜索：开，但当前服务商没有原生联网');
+  }
+
+  function setWebSearch(on, quiet) {
+    S.settings.webSearch = !!on;
+    saveSettings();
+    const box = $('#setWebSearch');
+    if (box) box.checked = S.settings.webSearch;
+    updateWebBtn();
+    if (quiet) return;
+    if (!S.settings.webSearch) { toast('联网搜索已关闭'); return; }
+    const cfg = activeConfig();
+    if (cfg && !webSearchSpec(cfg.baseUrl)) {
+      toast('已开启，但当前服务商没有原生联网');
+      return;
+    }
+    toast('联网搜索已开启');
+  }
+
+  /* ------------------------------------------------------------ 联网搜索 */
+  // 各家的原生联网参数长得完全不一样，所以这里只做一件事：
+  // 认得出服务商就发对应参数，认不出就一个字段都不发（不做本地抓网页的兜底）。
+  const WEB_PROVIDERS = [
+    {
+      name: '智谱 GLM',
+      test: /open\.bigmodel\.cn/i,
+      extra: { tools: [{ type: 'web_search', web_search: { enable: true } }] }
+    },
+    {
+      name: 'Kimi',
+      test: /(api\.moonshot\.cn|platform\.kimi\.com)/i,
+      // $web_search 由月之暗面服务端执行，开着思考模式不生效，所以一并关掉
+      extra: {
+        tools: [{ type: 'builtin_function', function: { name: '$web_search' } }],
+        thinking: { type: 'disabled' }
+      }
+    },
+    {
+      name: 'OpenRouter',
+      test: /openrouter\.ai/i,
+      extra: { plugins: [{ id: 'web' }] }
+    },
+    {
+      name: '通义千问',
+      test: /(dashscope\.aliyuncs\.com|bailian)/i,
+      extra: { enable_search: true }
+    }
+  ];
+
+  function webSearchSpec(baseUrl) {
+    const u = String(baseUrl || '');
+    if (!u) return null;
+    for (let i = 0; i < WEB_PROVIDERS.length; i++) {
+      if (WEB_PROVIDERS[i].test.test(u)) return WEB_PROVIDERS[i];
+    }
+    return null;
+  }
+
+  function webSearchNames() {
+    return WEB_PROVIDERS.map(p => p.name).join(' / ');
+  }
+
+  // 本次请求实际生效的联网配置；关掉开关或服务商不支持时返回 null
+  function webSearchActive(cfg) {
+    if (!cfg || !S.settings.webSearch) return null;
+    return webSearchSpec(cfg.baseUrl);
   }
 
   function buildPayload(cfg, conv) {
@@ -769,6 +850,11 @@
       messages: msgs
     };
     if (cfg.headers && typeof cfg.headers === 'object') payload.headers = cfg.headers;
+    const spec = webSearchActive(cfg);
+    if (spec) {
+      payload.webSearch = true;
+      payload.extra = spec.extra;
+    }
     return payload;
   }
 
@@ -781,7 +867,11 @@
   }
 
   function startRequest(conv, cfg) {
-    conv.messages.push({ role: 'assistant', content: '', reasoning: '', ts: Date.now(), model: cfg.model });
+    const web = !!webSearchActive(cfg);
+    conv.messages.push({
+      role: 'assistant', content: '', reasoning: '',
+      ts: Date.now(), model: cfg.model, web: web || undefined
+    });
     const msg = conv.messages[conv.messages.length - 1];
     renderConv();
     scrollBottom(false);
@@ -1002,6 +1092,7 @@
     if (L) finishLive(streamingId, null, null);
   });
   $('#btnImage').addEventListener('click', () => { try { Native.pickImage(); } catch (e) {} });
+  $('#btnWeb').addEventListener('click', () => setWebSearch(!S.settings.webSearch));
 
   let voiceBase = '';
   let voiceOn = false;
@@ -1331,6 +1422,17 @@
 
   // 当前版本更新公告。升级后第一次打开显示一次；设置里也可以手动重看。
   const RELEASE_NOTICES = {
+    '1.2.7': {
+      title: 'ProChat 1.2.7 更新公告',
+      date: '2026-10-27',
+      notes: [
+        '• 新增联网搜索开关：输入框左边多了一个地球图标，点一下变蓝就是开着。',
+        '• 只对自带联网能力的服务商生效：智谱 GLM、Kimi、OpenRouter、通义千问。',
+        '• 其他服务商不会发送任何联网参数，也不会在本地抓网页冒充联网。',
+        '• 回答下面会标一个「联网」，一眼看出这条回复查过网。',
+        '• 网页版同步更新，iPhone 刷新页面即可。'
+      ].join('\n')
+    },
     '1.2.6': {
       title: 'ProChat 1.2.6 更新公告',
       date: '2026-10-27',
@@ -1733,6 +1835,9 @@
     saveSettings();
     refreshUpdateStatus();
   });
+  $('#setWebSearch').addEventListener('change', (e) => {
+    setWebSearch(e.target.checked, true);
+  });
   $('#btnSaveApiBase').addEventListener('click', () => {
     let v = $('#setApiBase').value.trim().replace(/\/+$/, '');
     if (v && !/^https?:\/\//i.test(v)) { toast('地址要以 http:// 或 https:// 开头'); return; }
@@ -1758,6 +1863,8 @@
       ? '已保存，留空继续使用' : '同服务可留空，否则请填转写 Key';
     toggleVoiceApiBox();
     $('#setAutoUpdate').checked = S.settings.autoUpdate !== false;
+    $('#setWebSearch').checked = !!S.settings.webSearch;
+    updateWebBtn();
     $('#setApiBase').value = S.settings.apiBase || DEFAULT_API_BASE;
     $$('#themeSeg button').forEach(b => b.classList.toggle('on', b.dataset.v === S.settings.theme));
     const info = appInfoSafe();

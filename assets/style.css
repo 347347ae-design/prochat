@@ -369,6 +369,15 @@ details.reason .rmd p { margin: 0 0 6px; }
   box-shadow: 0 0 0 3px rgba(76, 141, 255, .12);
 }
 .inputrow .iconbtn { color: var(--fg-faint); }
+.inputrow .iconbtn.on {
+  color: var(--accent);
+  background: rgba(76, 141, 255, .14);
+}
+/* 开着但当前服务商不支持，用琥珀色区分，避免以为已经在联网 */
+.inputrow .iconbtn.on.unsupported {
+  color: #D89B3C;
+  background: rgba(216, 155, 60, .14);
+}
 
 #ta {
   flex: 1; min-height: 30px; max-height: 132px;

@@ -7,7 +7,7 @@
  *   - 页面导航、JS、CSS：先走网络，失败再回退缓存（保证更新及时）
  *   - 图标、字体等静态资源：先给缓存，同时后台更新
  */
-var CACHE = 'prochat-1.2.6';
+var CACHE = 'prochat-1.2.7';
 var SHELL = [
   './',
   './index.html',

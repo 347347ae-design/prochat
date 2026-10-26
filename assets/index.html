@@ -48,6 +48,9 @@
   <footer id="composer">
     <div class="attachbox" id="attachBox"></div>
     <div class="inputrow" id="inputRow">
+      <button class="iconbtn sm" id="btnWeb" aria-label="联网搜索" aria-pressed="false" title="联网搜索：关">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3.2c2.6 2.4 4 5.5 4 8.8s-1.4 6.4-4 8.8c-2.6-2.4-4-5.5-4-8.8s1.4-6.4 4-8.8z"/></svg>
+      </button>
       <button class="iconbtn sm" id="btnImage" aria-label="图片">
         <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="8.5" cy="9.5" r="1.6"/><path d="M21 16l-4.5-4.5L7 20"/></svg>
       </button>
@@ -120,6 +123,11 @@
         <span>温度 <b id="tempVal">0.7</b><em class="dim">越低越稳，越高越发散</em></span>
         <input id="setTemp" type="range" min="0" max="2" step="0.1">
       </label>
+      <label class="checkrow">
+        <input type="checkbox" id="setWebSearch">
+        <span>联网搜索</span>
+      </label>
+      <p class="note">只对自带联网能力的服务商生效：智谱 GLM、Kimi、OpenRouter、通义千问。其他服务商不会带联网参数，也不会在本地抓网页冒充联网。开关在输入框左边的地球图标上。</p>
     </div>
 
     <div class="section">

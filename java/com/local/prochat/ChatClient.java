@@ -139,6 +139,20 @@ class ChatClient {
         if (p.has("temperature")) body.put("temperature", p.optDouble("temperature", 0.7));
         int maxTokens = p.optInt("maxTokens", 0);
         if (maxTokens > 0) body.put("max_tokens", maxTokens);
+        // 联网搜索等厂商私有参数由前端决定，这里原样透传
+        JSONObject extra = p.optJSONObject("extra");
+        if (extra != null) {
+            Iterator<String> keys = extra.keys();
+            while (keys.hasNext()) {
+                String k = keys.next();
+                Object v = extra.opt(k);
+                if (k == null || k.isEmpty() || v == null || v == JSONObject.NULL) continue;
+                try {
+                    body.put(k, v);
+                } catch (Throwable ignored) {
+                }
+            }
+        }
 
         byte[] bytes = body.toString().getBytes(StandardCharsets.UTF_8);
         try (OutputStream out = c.getOutputStream()) {

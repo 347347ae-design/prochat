@@ -14,7 +14,7 @@
   if (/(?:^|[?&])mock=1(?:&|$)/.test(location.search)) return; // 设计预览
 
   var P = 'pc:';
-  var VERSION = '1.2.6';
+  var VERSION = '1.2.7';
   var IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   var STANDALONE = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
@@ -218,6 +218,12 @@
     var body = { model: p.model, messages: p.messages || [], stream: true };
     if (p.temperature != null && p.temperature !== '') body.temperature = Number(p.temperature);
     if (Number(p.maxTokens) > 0) body.max_tokens = Number(p.maxTokens);
+    // 联网搜索等厂商私有参数由 app.js 决定，这里原样带上
+    if (p.extra && typeof p.extra === 'object') {
+      for (var ek in p.extra) {
+        if (Object.prototype.hasOwnProperty.call(p.extra, ek)) body[ek] = p.extra[ek];
+      }
+    }
 
     var ctrl = new AbortController();
     streams[id] = ctrl;
