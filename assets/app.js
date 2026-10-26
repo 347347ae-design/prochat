@@ -246,7 +246,7 @@
   const httpWaiters = new Map();
   let httpSeq = 0;
 
-  function nativeHttp(method, url, body) {
+  function nativeHttp(method, url, body, headers) {
     return new Promise((resolve, reject) => {
       if (!Native || typeof Native.httpGet !== 'function') {
         reject(new Error('当前版本不支持网络请求'));
@@ -260,8 +260,13 @@
       }, 22000);
       httpWaiters.set(id, { resolve, reject, timer });
       try {
-        if (method === 'POST') Native.httpPost(id, url, body || '');
-        else Native.httpGet(id, url);
+        if (method === 'POST') {
+          if (headers && typeof Native.httpPostAuth === 'function') {
+            Native.httpPostAuth(id, url, body || '', JSON.stringify(headers));
+          } else {
+            Native.httpPost(id, url, body || '');
+          }
+        } else Native.httpGet(id, url);
       } catch (e) {
         clearTimeout(timer);
         httpWaiters.delete(id);
@@ -637,6 +642,8 @@
     }
     if (msg.content) {
       h += '<div class="md">' + renderMarkdown(msg.content) + '</div>';
+    } else if (msg.searching) {
+      h += '<div class="searching"><i></i><i></i><i></i><span>正在搜索网页…</span></div>';
     } else if (streaming) {
       h += '<div class="thinking"><i></i><i></i><i></i></div>';
     }
@@ -648,7 +655,7 @@
 
   function metaHtml(msg, streaming) {
     const parts = [];
-    if (msg.web) parts.push('联网');
+    if (msg.web) parts.push(msg.webN ? '联网 ' + msg.webN + ' 源' : '联网');
     if (msg.model) parts.push(msg.model);
     if (msg.ms) parts.push((msg.ms / 1000).toFixed(1) + 's');
     if (msg.tokens) parts.push(msg.tokens + ' tokens');
@@ -750,7 +757,7 @@
     b.classList.toggle('unsupported', on && !spec);
     b.setAttribute('aria-pressed', on ? 'true' : 'false');
     b.title = !on ? '联网搜索：关'
-      : (spec ? '联网搜索：开（' + spec.name + '）' : '联网搜索：开，但当前服务商没有原生联网');
+      : (spec ? '联网搜索：开（' + spec.name + '）' : '联网搜索：开，但当前服务商没有联网');
   }
 
   function setWebSearch(on, quiet) {
@@ -763,23 +770,26 @@
     if (!S.settings.webSearch) { toast('联网搜索已关闭'); return; }
     const cfg = activeConfig();
     if (cfg && !webSearchSpec(cfg.baseUrl)) {
-      toast('已开启，但当前服务商没有原生联网');
+      toast('已开启，但当前服务商没有联网');
       return;
     }
     toast('联网搜索已开启');
   }
 
   /* ------------------------------------------------------------ 联网搜索 */
-  // 各家的原生联网参数长得完全不一样，所以这里只做一件事：
-  // 认得出服务商就发对应参数，认不出就一个字段都不发（不做本地抓网页的兜底）。
+  // 两种模式：
+  //   inline —— 服务商自带联网，往 chat/completions 里塞几个参数就行
+  //   search —— 服务商只开放了搜索接口（DeepSeek），得自己先搜、再把结果喂给模型
   const WEB_PROVIDERS = [
     {
       name: '智谱 GLM',
+      mode: 'inline',
       test: /open\.bigmodel\.cn/i,
       extra: { tools: [{ type: 'web_search', web_search: { enable: true } }] }
     },
     {
       name: 'Kimi',
+      mode: 'inline',
       test: /(api\.moonshot\.cn|platform\.kimi\.com)/i,
       // $web_search 由月之暗面服务端执行，开着思考模式不生效，所以一并关掉
       extra: {
@@ -789,13 +799,20 @@
     },
     {
       name: 'OpenRouter',
+      mode: 'inline',
       test: /openrouter\.ai/i,
       extra: { plugins: [{ id: 'web' }] }
     },
     {
       name: '通义千问',
+      mode: 'inline',
       test: /(dashscope\.aliyuncs\.com|bailian)/i,
       extra: { enable_search: true }
+    },
+    {
+      name: 'DeepSeek',
+      mode: 'search',
+      test: /api\.deepseek\.com/i
     }
   ];
 
@@ -818,7 +835,51 @@
     return webSearchSpec(cfg.baseUrl);
   }
 
-  function buildPayload(cfg, conv) {
+  // DeepSeek 的搜索接口：https://api.deepseek.com/v1/tools/search
+  function searchUrl(baseUrl) {
+    let u = String(baseUrl || '').trim().replace(/\/+$/, '');
+    u = u.replace(/\/(chat\/completions|completions|models|responses)$/i, '');
+    if (!/\/v1$/i.test(u)) u += '/v1';
+    return u + '/tools/search';
+  }
+
+  // 返回 [{ title, url, summary }]，空数组表示没搜到
+  function searchWeb(cfg, query) {
+    const q = String(query || '').replace(/\s+/g, ' ').trim().slice(0, 128);
+    if (!q) return Promise.resolve([]);
+    const body = JSON.stringify({ query: q, count: 5, need_content: false });
+    const headers = { Accept: 'application/json' };
+    const key = secretOf(cfg.id);
+    if (key) headers.Authorization = 'Bearer ' + key;
+    if (cfg.headers && typeof cfg.headers === 'object') Object.assign(headers, cfg.headers);
+    return nativeHttp('POST', searchUrl(cfg.baseUrl), body, headers).then((r) => {
+      let data = null;
+      try { data = JSON.parse(r.body || ''); } catch (e) {}
+      if (r.status < 200 || r.status >= 300) {
+        const msg = data && data.error && (data.error.message || data.error);
+        throw new Error(typeof msg === 'string' && msg ? msg : ('搜索接口返回 HTTP ' + r.status));
+      }
+      const list = (data && data.results) || [];
+      return list.filter(x => x && x.url).slice(0, 5);
+    });
+  }
+
+  function two(n) { return (n < 10 ? '0' : '') + n; }
+
+  function buildWebContext(results, query) {
+    const d = new Date();
+    const stamp = d.getFullYear() + '-' + two(d.getMonth() + 1) + '-' + two(d.getDate())
+      + ' ' + two(d.getHours()) + ':' + two(d.getMinutes());
+    const items = results.map((r, i) => {
+      const sum = String(r.summary || r.snippet || '').replace(/\s+/g, ' ').trim().slice(0, 500);
+      return '[' + (i + 1) + '] ' + (r.title || '无标题') + '\n' + r.url + (sum ? '\n' + sum : '');
+    }).join('\n\n');
+    return '以下是我在 ' + stamp + ' 用「' + query + '」搜到的网页资料，请优先参考这些资料回答；'
+      + '用到某条资料时在句末标出编号（如 [1]），回答末尾再列出对应链接。'
+      + '如果这些资料跟问题无关，就按你自己的知识回答，不要硬套。\n\n' + items;
+  }
+
+  function buildPayload(cfg, conv, webCtx) {
     const msgs = [];
     const sys = (S.settings.systemPrompt || '').trim();
     if (sys) msgs.push({ role: 'system', content: sys });
@@ -840,6 +901,21 @@
         msgs.push({ role: 'assistant', content: m.content });
       }
     });
+    // 自搜模式：把资料挂到最后一条用户消息上，不改动会话里存的内容
+    if (webCtx) {
+      for (let i = msgs.length - 1; i >= 0; i--) {
+        if (msgs[i].role !== 'user') continue;
+        const c = msgs[i].content;
+        if (typeof c === 'string') {
+          msgs[i].content = c + '\n\n---\n' + webCtx;
+        } else if (Array.isArray(c)) {
+          const first = c.filter(p => p && p.type === 'text')[0];
+          if (first) first.text = (first.text || '') + '\n\n---\n' + webCtx;
+          else c.unshift({ type: 'text', text: webCtx });
+        }
+        break;
+      }
+    }
     const payload = {
       baseUrl: cfg.baseUrl,
       apiKey: secretOf(cfg.id),
@@ -851,7 +927,7 @@
     };
     if (cfg.headers && typeof cfg.headers === 'object') payload.headers = cfg.headers;
     const spec = webSearchActive(cfg);
-    if (spec) {
+    if (spec && spec.mode === 'inline' && spec.extra) {
       payload.webSearch = true;
       payload.extra = spec.extra;
     }
@@ -866,11 +942,11 @@
     return /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/i.test(u || '');
   }
 
-  function startRequest(conv, cfg) {
-    const web = !!webSearchActive(cfg);
+  function startRequest(conv, cfg, webQuery) {
+    const spec = webSearchActive(cfg);
     conv.messages.push({
       role: 'assistant', content: '', reasoning: '',
-      ts: Date.now(), model: cfg.model, web: web || undefined
+      ts: Date.now(), model: cfg.model, web: spec ? true : undefined
     });
     const msg = conv.messages[conv.messages.length - 1];
     renderConv();
@@ -881,8 +957,42 @@
     live[rid] = { conv: conv, msg: msg, el: messagesEl.lastElementChild, started: Date.now(), firstAt: 0, lastPaint: 0, timer: 0 };
     updateSendState();
     try { Native.keepAwake(true); } catch (e) {}
+
+    // 自搜模式：先搜，再把资料带进对话
+    if (spec && spec.mode === 'search' && webQuery) {
+      msg.searching = true;
+      paintLive(live[rid]);
+      searchWeb(cfg, webQuery).then((results) => {
+        const L = live[rid];
+        msg.searching = false;
+        if (!L) return;
+        if (!results.length) {
+          msg.web = undefined;
+          toast('没搜到相关网页，直接回答');
+          askNow(rid, cfg, conv, null);
+          return;
+        }
+        msg.webN = results.length;
+        msg.sources = results.map(r => ({ t: r.title || '', u: r.url }));
+        askNow(rid, cfg, conv, buildWebContext(results, webQuery));
+      }).catch((e) => {
+        const L = live[rid];
+        msg.searching = false;
+        msg.web = undefined;
+        if (!L) return;
+        toast('联网搜索失败：' + e.message);
+        askNow(rid, cfg, conv, null);
+      });
+      return;
+    }
+
+    askNow(rid, cfg, conv, null);
+  }
+
+  function askNow(rid, cfg, conv, webCtx) {
+    if (!live[rid]) return;
     try {
-      Native.ask(rid, JSON.stringify(buildPayload(cfg, conv)));
+      Native.ask(rid, JSON.stringify(buildPayload(cfg, conv, webCtx)));
     } catch (e) {
       window.ProChatNative.onError(rid, '调用失败：' + e.message);
     }
@@ -919,7 +1029,7 @@
     autoGrow();
     updateHeader();
     saveConvs();
-    startRequest(conv, cfg);
+    startRequest(conv, cfg, text);
   }
 
   function regenerate() {
@@ -931,8 +1041,10 @@
       conv.messages.pop();
     }
     if (!conv.messages.length) return;
+    const last = conv.messages[conv.messages.length - 1];
+    const q = last && last.role === 'user' && typeof last.content === 'string' ? last.content : '';
     saveConvs();
-    startRequest(conv, cfg);
+    startRequest(conv, cfg, q);
   }
 
   function ensureConv() {
@@ -1422,6 +1534,18 @@
 
   // 当前版本更新公告。升级后第一次打开显示一次；设置里也可以手动重看。
   const RELEASE_NOTICES = {
+    '1.2.8': {
+      title: 'ProChat 1.2.8 更新公告',
+      date: '2026-10-27',
+      notes: [
+        '• DeepSeek 也能联网了。它没把联网做进 chat/completions，而是单独开了搜索接口，所以走的是另一条路。',
+        '• 开关打开时，App 先用你的问题调 DeepSeek 的 /v1/tools/search，把搜到的标题、链接、摘要拼进上下文，再发给模型。',
+        '• 用同一把 API Key，不用额外配置；约 ¥0.005/次，只按成功请求计费。',
+        '• 回答下面会标「联网 5 源」，能看出这次用了几条资料。',
+        '• 搜不到或搜索失败会自动降级成直接回答，不会卡住。',
+        '• 网页版同步更新，iPhone 刷新页面即可。'
+      ].join('\n')
+    },
     '1.2.7': {
       title: 'ProChat 1.2.7 更新公告',
       date: '2026-10-27',

@@ -255,6 +255,11 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface
+        public void httpPostAuth(String id, String url, String body, String headers) {
+            if (net != null) net.postAuth(id, url, body, headers);
+        }
+
+        @JavascriptInterface
         public String getStore(String key) {
             return store.get(key);
         }

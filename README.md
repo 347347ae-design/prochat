@@ -6,10 +6,12 @@
 有安卓 App 和网页版（iPhone 用这个）两套壳，界面和逻辑完全共用。
 
 GitHub：<https://github.com/347347ae-design/prochat>
-APK：[GitHub Releases v1.2.7](https://github.com/347347ae-design/prochat/releases/tag/v1.2.7)（约 546 KB），或本地构建输出 `dist/ProChat-1.2.7.apk`
+APK：[GitHub Releases v1.2.8](https://github.com/347347ae-design/prochat/releases/tag/v1.2.8)（约 550 KB），或本地构建输出 `dist/ProChat-1.2.8.apk`
 网页版：<https://ai.h80b5c8fe.nyat.app:21398/prochat/app/>（iPhone 加到主屏幕即可当 App 用）
 
-> 1.2.7 更新：新增联网搜索开关（输入框左边的地球图标）。只对自带联网能力的服务商生效——智谱 GLM、Kimi、OpenRouter、通义千问；其他服务商一个联网字段都不发，也不做本地抓网页的兜底。回答下面会标「联网」，一眼看出这条回复查过网。
+> 1.2.8 更新：补上 DeepSeek 的联网。DeepSeek 没把联网做进 `chat/completions`，而是单独开了 `/v1/tools/search` 和 `/v1/tools/fetch`，所以走的是「先用你的问题搜，把资料拼进上下文，再发给模型」这条路。用同一把 API Key，约 ¥0.005/次，只按成功请求计费；搜不到或失败会自动降级成直接回答。回答下面标「联网 5 源」。
+>
+> 1.2.7 更新：新增联网搜索开关（输入框左边的地球图标）。智谱 GLM、Kimi、OpenRouter、通义千问走服务商自带的联网参数；其他服务商一个联网字段都不发，也不做本地抓网页的兜底。回答下面会标「联网」，一眼看出这条回复查过网。
 >
 > 1.2.6 更新：修「更新提示不及时」。启动就检查更新（以前要隔 24 小时），从后台切回来也会查；检查失败不再锁一整天；点过「稍后」的版本 3 天后会再提醒；设置里的「检查更新」发现有新版会直接高亮成「有新版本 x.x.x，查看」。另外全新安装不再弹「更新公告」，只有真正从旧版本升上来才显示。
 >

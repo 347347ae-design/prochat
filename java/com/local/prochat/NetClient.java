@@ -40,11 +40,16 @@ class NetClient {
     }
 
     void get(final String id, final String url) {
-        request(id, "GET", url, null);
+        request(id, "GET", url, null, null);
     }
 
     void post(final String id, final String url, final String body) {
-        request(id, "POST", url, body);
+        request(id, "POST", url, body, null);
+    }
+
+    /** 带自定义请求头的 POST，给 DeepSeek 搜索这类需要 Bearer 鉴权的接口用。 */
+    void postAuth(final String id, final String url, final String body, final String headersJson) {
+        request(id, "POST", url, body, headersJson);
     }
 
     void shutdown() {
@@ -55,7 +60,8 @@ class NetClient {
         pool.shutdownNow();
     }
 
-    private void request(final String id, final String method, final String url, final String body) {
+    private void request(final String id, final String method, final String url,
+                         final String body, final String headersJson) {
         pool.execute(new Runnable() {
             @Override
             public void run() {
@@ -77,6 +83,7 @@ class NetClient {
                     conn.setRequestProperty("Accept-Encoding", "identity");
                     conn.setRequestProperty("Cache-Control", "no-cache");
                     conn.setRequestProperty("User-Agent", "ProChat/Android");
+                    applyHeaders(conn, headersJson);
 
                     if ("POST".equals(method)) {
                         byte[] data = (body == null ? "" : body).getBytes(StandardCharsets.UTF_8);
@@ -120,6 +127,21 @@ class NetClient {
                 }
             }
         });
+    }
+
+    private static void applyHeaders(HttpURLConnection conn, String headersJson) {
+        if (headersJson == null || headersJson.trim().isEmpty()) return;
+        try {
+            JSONObject o = new JSONObject(headersJson);
+            java.util.Iterator<String> keys = o.keys();
+            while (keys.hasNext()) {
+                String k = keys.next();
+                String v = o.optString(k, "");
+                if (k == null || k.isEmpty() || v.isEmpty()) continue;
+                conn.setRequestProperty(k, v);
+            }
+        } catch (Throwable ignored) {
+        }
     }
 
     private static String readAll(InputStream in) {

@@ -14,7 +14,7 @@
   if (/(?:^|[?&])mock=1(?:&|$)/.test(location.search)) return; // 设计预览
 
   var P = 'pc:';
-  var VERSION = '1.2.7';
+  var VERSION = '1.2.8';
   var IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   var STANDALONE = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
@@ -293,10 +293,19 @@
   }
 
   /* ------------------------------------------------------------ 普通 HTTP */
-  function doHttp(id, url, method, body) {
+  function doHttp(id, url, method, body, headersJson) {
     var opt = { method: method, mode: 'cors', cache: 'no-store', credentials: 'omit' };
     if (method === 'POST') {
       opt.headers = { 'Content-Type': 'application/json' };
+      if (headersJson) {
+        try {
+          var extra = JSON.parse(headersJson);
+          Object.keys(extra || {}).forEach(function (k) {
+            var v = extra[k];
+            if (k && v != null && String(v) !== '') opt.headers[k] = String(v);
+          });
+        } catch (e) {}
+      }
       opt.body = body || '';
     }
     fetch(url, opt).then(function (res) {
@@ -837,6 +846,7 @@
 
     httpGet: function (id, url) { doHttp(id, url, 'GET'); },
     httpPost: function (id, url, body) { doHttp(id, url, 'POST', body); },
+    httpPostAuth: function (id, url, body, headers) { doHttp(id, url, 'POST', body, headers); },
 
     ask: ask,
     stop: stop,

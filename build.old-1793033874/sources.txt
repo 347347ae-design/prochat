@@ -1,0 +1,6 @@
+D:\ds\prochat\java\com\local\prochat\ChatClient.java
+D:\ds\prochat\java\com\local\prochat\MainActivity.java
+D:\ds\prochat\java\com\local\prochat\NetClient.java
+D:\ds\prochat\java\com\local\prochat\SecretStore.java
+D:\ds\prochat\java\com\local\prochat\Store.java
+D:\ds\prochat\java\com\local\prochat\VoiceClient.java
