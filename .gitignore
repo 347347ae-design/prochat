@@ -15,6 +15,8 @@ build.local.ps1
 server/config.json
 server-admin.txt
 server/data/
+# 网页版产物（由 tools/build-web.js 生成）
+server/public/app/
 
 # 系统/编辑器临时文件
 .DS_Store

@@ -154,6 +154,12 @@
   }
 
   /* ------------------------------------------------------------ 小工具 */
+  // 网页版（PWA）没有原生层，个别 UI 需要区别对待
+  const IS_WEB = (() => {
+    try { return !!(window.Native && window.Native.platform && window.Native.platform() === 'web'); }
+    catch (e) { return false; }
+  })();
+
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => Array.prototype.slice.call((r || document).querySelectorAll(s));
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -2212,7 +2218,22 @@
 
     if (!S.configs.length) setTimeout(() => toast('先在设置里添加你自己的模型服务'), 700);
     setTimeout(maybeShowNotice, 1100);
-    setTimeout(maybeAutoCheck, 1800);
+
+    if (IS_WEB) {
+      // 网页版没有 APK 可更新，藏掉检查更新；并说明 Key 的存放位置
+      const bu = $('#btnCheckUpdate');
+      if (bu) bu.classList.add('hidden');
+      const kn = $('#keyNote');
+      if (kn) kn.textContent = '网页版没有系统级加密，Key 存在浏览器本地（localStorage）。公用设备用完请在设置里清除数据。';
+      const at = $('#aboutText');
+      if (at) {
+        at.insertAdjacentHTML('afterend',
+          '<p class="note">网页版的 API Key 存在浏览器本地（localStorage），没有系统级加密。'
+          + '公用设备用完请在设置里清除数据，或直接关掉浏览器。</p>');
+      }
+    } else {
+      setTimeout(maybeAutoCheck, 1800);
+    }
   }
 
   init();

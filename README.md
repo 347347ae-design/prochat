@@ -1,12 +1,17 @@
 # ProChat · 本地直连版
 
-一个只做一件事的安卓 App：**填上你自己的 API Key，直接问你自己的模型**。
-没有内置模型、没有中转服务器、没有账号系统——你说的话和模型的回复只在手机和你填的接口之间流动。
+一个只做一件事的客户端：**填上你自己的 API Key，直接问你自己的模型**。
+没有内置模型、没有中转服务器、没有账号系统——你说的话和模型的回复只在你的设备和填的接口之间流动。
+
+有安卓 App 和网页版（iPhone 用这个）两套壳，界面和逻辑完全共用。
 
 GitHub：<https://github.com/347347ae-design/prochat>
 APK：[GitHub Releases v1.2.5](https://github.com/347347ae-design/prochat/releases/tag/v1.2.5)（约 530 KB），或本地构建输出 `dist/ProChat-1.2.5.apk`
+网页版：<https://ai.h80b5c8fe.nyat.app:21398/prochat/app/>（iPhone 加到主屏幕即可当 App 用）
 
 > 1.2.5 更新：语音输入默认改为接口转写，不再依赖谷歌语音服务；支持硅基流动 SenseVoice、OpenAI Whisper 等 OpenAI 兼容转写接口。屏幕左右边缘向内滑动可以返回上一页。1.2.4 的更新公告、打赏和图片上传保持不变。
+>
+> 网页版（同一份代码）：新增 `web.js`，在浏览器里用 fetch + ReadableStream 复刻原生桥，流式对话、图片上传、语音转写、返回手势全部可用；可添加到主屏幕，离线也能打开界面。详见[网页版 / iPhone](#网页版--iphone)。
 >
 > 1.2.4 更新：新增「更新公告」弹窗，升级后第一次打开会显示本次更新内容；设置里也可以随时重看。
 >
@@ -32,6 +37,46 @@ APK：[GitHub Releases v1.2.5](https://github.com/347347ae-design/prochat/releas
 
 > 这是用本地密钥签名的 APK，不能上架应用商店，但可以正常安装使用。
 > 首次安装如果被「安全中心」拦，选「仍然安装」。
+
+## 网页版 / iPhone
+
+iPhone 没有 APK，用网页版：**<https://ai.h80b5c8fe.nyat.app:21398/prochat/app/>**
+
+### 装到主屏幕
+
+1. 用 **Safari** 打开上面的地址（微信内置浏览器不行，要先在右上角「在浏览器打开」）。
+2. 点底部 **分享** → **添加到主屏幕** → 右上角「添加」。
+3. 桌面出现 ProChat 图标，点开就是全屏，没有地址栏，和 App 一样。
+
+安卓也可以用网页版：Chrome 打开后会提示「安装应用」，或在菜单里选「添加到主屏幕」。
+
+### 和安卓版的区别
+
+| | 安卓 App | 网页版 |
+| --- | --- | --- |
+| 网络请求 | Java 原生 HTTP，无跨域限制 | 浏览器 fetch，**受 CORS 限制** |
+| API Key | 系统 Keystore 加密 | 浏览器 localStorage，**没有系统级加密** |
+| 录音 | AudioRecord → 16kHz WAV | MediaRecorder → 解码重采样成同样的 16kHz WAV |
+| 系统语音 | 调用手机自带识别 | Web Speech API（iOS 走 Siri 识别） |
+| 返回 | 系统返回键 / 边缘滑动 | 浏览器返回 / 边缘滑动，都会关掉最上层浮层 |
+| 更新 | App 内检查更新下载 APK | 刷新页面即最新，无需更新 |
+
+> **关于跨域**：网页版能不能用，取决于你的模型服务是否允许浏览器直连。
+> DeepSeek、硅基流动、OpenAI 等主流服务都支持；如果某个中转服务不开 CORS，
+> 浏览器会报「连不上接口」，这种情况只能用安卓版。
+>
+> **关于安全**：网页版的 Key 存在浏览器本地，公用电脑或公用手机上用完，
+> 请到设置里清除数据。安卓版的 Key 在系统 Keystore 里，安全性更高。
+
+### 自己部署网页版
+
+```powershell
+node tools\build-web.js          # 把 assets/ 组装到 server/public/app/
+# 把 server/public/app/ 整个目录传到服务器，访问 https://你的域名/app/ 即可
+```
+
+`server.js` 已经带 `/app/` 静态路由（`text/html`、`application/manifest+json` 等 MIME 都配好了），
+Service Worker 的作用域是 `/app/`，只缓存界面外壳，不缓存任何聊天内容。
 
 ## 怎么用
 
@@ -99,6 +144,7 @@ APK：[GitHub Releases v1.2.5](https://github.com/347347ae-design/prochat/releas
 - 图片上传（多模态模型，最多 4 张，自动压缩到 1280px / JPEG）
 - 语音输入：默认接口转写（硅基流动 SenseVoice / OpenAI Whisper 等），不依赖谷歌；也可切换系统识别
 - 屏幕左右边缘向内滑动可返回上一页（同时兼容系统手势返回）
+- 网页版 / PWA：同一套界面跑在浏览器里，iPhone 添加到主屏幕即可全屏使用；离线可打开界面
 - 系统提示词、上下文条数、温度、最大 tokens 可调
 - 深色 / 浅色 / 跟随系统
 - 回复下方显示耗时、字数、token 用量，可复制 / 重新生成
@@ -125,10 +171,14 @@ APK：[GitHub Releases v1.2.5](https://github.com/347347ae-design/prochat/releas
 ```
 prochat/
 ├─ AndroidManifest.xml
-├─ assets/            界面（HTML/CSS/JS），运行在 WebView 里
+├─ assets/            界面（HTML/CSS/JS），安卓 WebView 和网页版共用
 │  ├─ index.html
 │  ├─ style.css
-│  ├─ app.js
+│  ├─ app.js          界面与业务逻辑（不认识平台，只认 Native 桥）
+│  ├─ web.js          网页版原生桥：fetch + SSE、录音转写、返回拦截、键盘适配
+│  ├─ sw.js           Service Worker（只缓存外壳，不缓存聊天）
+│  ├─ manifest.webmanifest  PWA 清单（名称、图标、独立窗口）
+│  ├─ icons/          192/512/maskable/apple-touch 图标
 │  ├─ donate-wechat.jpg  微信打赏收款码（本地图片）
 │  └─ katex/           离线公式渲染（KaTeX，MIT 协议）
 ├─ java/com/local/prochat/
@@ -138,15 +188,16 @@ prochat/
 │  ├─ NetClient.java       检查更新 / 留言板的轻量 HTTP 客户端
 │  ├─ SecretStore.java     Android Keystore 加密存储 API Key
 │  └─ Store.java           会话记录的本地文件存储
-├─ server/                 更新清单 + 留言板后端（Node，无第三方依赖）
+├─ server/                 更新清单 + 留言板后端 + 网页版（Node，无第三方依赖）
 │  ├─ server.js
 │  ├─ admin.html           管理后台（回复、隐藏、删除、发布更新）
 │  ├─ board.html           网页版公开留言板
 │  ├─ config.example.json  配置模板（真实 config.json 不提交）
-│  └─ public/              update.json（发布物）
+│  └─ public/              update.json + 各个 APK + app/（网页版产物）
 ├─ res/                   图标、主题
 ├─ tools/
 │  ├─ make-icons.ps1      生成启动图标
+│  ├─ build-web.js        组装网页版到 server/public/app/
 │  ├─ preview-server.js   桌面预览用静态服务器
 │  └─ preview-frame.html  手机尺寸预览外壳
 ├─ build.local.example.ps1 本地签名配置模板（真实 build.local.ps1 不提交）
@@ -154,7 +205,7 @@ prochat/
 └─ dist/                  本地构建产物（不提交；APK 见 GitHub Releases）
 ```
 
-> 仓库不包含 `prochat.jks`、`server/config.json`、`server-admin.txt`、`build.local.ps1`、`build/`、`dist/` 和 APK 构建产物。
+> 仓库不包含 `prochat.jks`、`server/config.json`、`server-admin.txt`、`build.local.ps1`、`build/`、`dist/`、`server/public/app/` 和 APK 构建产物。
 
 推送 `v*` 标签会触发 `.github/workflows/release.yml`：从固定地址下载 APK、校验 SHA-256，然后自动创建 GitHub Release。发布新版本前，先添加对应的 `.github/checksums/vX.Y.Z.sha256` 和 `.github/release-notes-X.Y.Z.md`。
 
@@ -204,4 +255,7 @@ SakuraFrp 隧道名 `prochat`，本机服务 `prochat-sakura`，隧道 ID `29674
 - 为避免把价格当成公式，`$...$` 会跳过纯数字、代码块和行内代码里的内容；复杂公式建议写在 `$$...$$` 里。
 - 检查更新和留言板依赖 `ai.h80b5c8fe.nyat.app:21398` 这台服务器；服务器、SakuraFrp 隧道或网络不可用时，会显示请求失败。聊天功能直连模型接口，不受影响。
 - 留言板没有账号系统，靠 IP 频率限制防刷；留言公开可见，不要填写敏感信息。
-- 本版本在桌面浏览器预览和真实后端接口上验证过；真机上的原生 HTTP 桥、Keystore、语音、选图仍需安装后实际确认。
+- 网页版受浏览器 CORS 限制：服务商不返回 `Access-Control-Allow-Origin` 时浏览器会拒绝请求，只能用安卓版。录音需要 https，且 iOS 上锁屏或切后台会中断录音。
+- 网页版把 API Key 存在 localStorage，没有系统级加密；安卓版用 Keystore 加密。
+- 安卓版在桌面浏览器预览和真实后端接口上验证过；真机上的原生 HTTP 桥、Keystore、语音、选图仍需安装后实际确认。
+- 网页版的流式对话、图片上传、录音转 WAV、语音转写、返回手势已在 Chromium 内核下用假服务端端到端跑通；iOS Safari 上的录音和键盘行为需要真机再确认一次。

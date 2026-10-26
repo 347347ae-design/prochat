@@ -50,10 +50,13 @@ html, body {
   font-size: 15px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
   overscroll-behavior: none;
+  touch-action: manipulation;
 }
 
-body { user-select: none; -webkit-user-select: none; }
+body { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 input, textarea { user-select: text; -webkit-user-select: text; font-family: inherit; }
 a { color: var(--accent); text-decoration: none; }
 button { font-family: inherit; }
@@ -69,7 +72,8 @@ svg {
 
 /* ---------------- layout ---------------- */
 #app {
-  height: 100%;
+  /* --app-h 由 web.js 按 visualViewport 实时写入，iOS 键盘弹出时才能正确收缩 */
+  height: var(--app-h, 100%);
   display: flex;
   flex-direction: column;
   position: relative;
@@ -969,3 +973,29 @@ input[type=range]::-webkit-slider-thumb {
 body, #composer, .topbar, .drawer, .panel, .sheet, .msg .bubble, .md code, .inputrow {
   transition: background-color .2s, color .2s, border-color .2s;
 }
+
+/* ---------------- iOS / PWA 适配 ---------------- */
+/* 正文要能选中、长按能复制，按钮和容器上则禁用长按菜单 */
+.md, .msg .bubble, .confirm-text, .upd-notes, .boarditem {
+  -webkit-touch-callout: default;
+}
+
+/* iOS 上 input 字号小于 16px 时，聚焦会自动放大整个页面。
+   只对 iOS 生效，安卓和桌面保持原有排版。 */
+@supports (-webkit-touch-callout: none) {
+  #ta,
+  input[type=text], input[type=url], input[type=password],
+  input[type=number], input[type=search], select, textarea {
+    font-size: 16px;
+  }
+  /* 独立运行（添加到主屏幕）时没有浏览器地址栏，顶部安全区要留够 */
+  .topbar { padding-top: calc(10px + env(safe-area-inset-top)); }
+}
+
+/* 独立窗口模式下，底部手势条区域不要被输入框压住 */
+@media (display-mode: standalone) {
+  #composer { padding-bottom: calc(9px + env(safe-area-inset-bottom)); }
+}
+
+/* 键盘弹出时安全区已经被键盘盖住，底部留白收一收，多给正文一点高度 */
+#app.kb-open #composer { padding-bottom: 6px; }

@@ -14,6 +14,23 @@ const crypto = require('crypto');
 const ROOT = __dirname;
 const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(ROOT, 'data');
 const PUBLIC_DIR = path.join(ROOT, 'public');
+// 网页版（PWA）静态文件目录，通过 /app/ 访问
+const WEB_DIR = path.join(PUBLIC_DIR, 'app');
+const WEB_TYPES = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'application/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.webmanifest': 'application/manifest+json; charset=utf-8',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+  '.woff2': 'font/woff2',
+  '.woff': 'font/woff',
+  '.ttf': 'font/ttf'
+};
 const CONFIG_PATH = path.join(ROOT, 'config.json');
 const DATA_PATH = path.join(DATA_DIR, 'feedback.json');
 const PORT = Number(process.env.PORT || 8788);
@@ -249,7 +266,7 @@ function writeUpdateFile(obj) {
   try { fs.chmodSync(file, 0o644); } catch (ignored) {}
 }
 
-function serveFile(res, file, type, downloadName, headOnly) {
+function serveFile(res, file, type, downloadName, headOnly, cacheControl) {
   fs.readFile(file, (err, buf) => {
     if (err) {
       sendJson(res, 404, { ok: false, error: '文件不存在' }, CORS);
@@ -257,6 +274,7 @@ function serveFile(res, file, type, downloadName, headOnly) {
     }
     const extra = {};
     if (downloadName) extra['Content-Disposition'] = 'attachment; filename="' + downloadName + '"';
+    if (cacheControl) extra['Cache-Control'] = cacheControl;
     if (headOnly) {
       res.writeHead(200, baseHeaders(Object.assign({
         'Content-Type': type || 'application/octet-stream',
@@ -510,6 +528,36 @@ async function handle(req, res) {
   if (apk && (req.method === 'GET' || req.method === 'HEAD')) {
     const name = path.basename(apk[1]);
     serveFile(res, path.join(PUBLIC_DIR, name), 'application/vnd.android.package-archive', name, req.method === 'HEAD');
+    return;
+  }
+
+  // 网页版 / PWA：/app/ 下的静态文件
+  if (pathname === '/app') {
+    res.writeHead(301, { Location: '/app/' });
+    res.end();
+    return;
+  }
+  if (pathname.startsWith('/app/') && (req.method === 'GET' || req.method === 'HEAD')) {
+    let rel;
+    try {
+      rel = decodeURIComponent(pathname.slice('/app/'.length));
+    } catch (e) {
+      sendJson(res, 400, { ok: false, error: '路径不合法' }, CORS);
+      return;
+    }
+    if (!rel || rel.slice(-1) === '/') rel += 'index.html';
+    const file = path.join(WEB_DIR, rel);
+    if (!path.resolve(file).startsWith(path.resolve(WEB_DIR))) {
+      sendJson(res, 403, { ok: false, error: 'forbidden' }, CORS);
+      return;
+    }
+    const ext = path.extname(file).toLowerCase();
+    const type = WEB_TYPES[ext] || 'application/octet-stream';
+    // 页面、脚本、manifest、SW 都不缓存，避免更新后拿到旧文件；
+    // 图片和字体给一天缓存，减少重复下载。
+    const longCache = ['.png', '.jpg', '.jpeg', '.svg', '.ico', '.woff2', '.woff', '.ttf'].indexOf(ext) >= 0;
+    serveFile(res, file, type, null, req.method === 'HEAD',
+      longCache ? 'public, max-age=86400' : 'no-cache');
     return;
   }
 
