@@ -1,0 +1,34 @@
+name: Publish APK release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download and verify APK
+        run: |
+          curl -fsSL --retry 3 --retry-delay 3 \
+            -o ProChat-1.2.2.apk \
+            "https://ai.h80b5c8fe.nyat.app:21398/prochat/ProChat-1.2.2.apk"
+          echo "D4A9683C998CBDED75B36909D56E9928C93B36AB899E481A1660431566A71277  ProChat-1.2.2.apk" | sha256sum -c -
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" ProChat-1.2.2.apk \
+            --title "ProChat 1.2.2" \
+            --notes-file .github/release-notes-1.2.2.md \
+            --latest
