@@ -4,8 +4,10 @@
 没有内置模型、没有中转服务器、没有账号系统——你说的话和模型的回复只在手机和你填的接口之间流动。
 
 GitHub：<https://github.com/347347ae-design/prochat>
-APK：[GitHub Releases v1.2.3](https://github.com/347347ae-design/prochat/releases/tag/v1.2.3)（约 526 KB），或本地构建输出 `dist/ProChat-1.2.3.apk`
+APK：[GitHub Releases v1.2.4](https://github.com/347347ae-design/prochat/releases/tag/v1.2.4)（约 526 KB），或本地构建输出 `dist/ProChat-1.2.4.apk`
 
+> 1.2.4 更新：新增「更新公告」弹窗，升级后第一次打开会显示本次更新内容；设置里也可以随时重看。
+>
 > 1.2.3 更新：修复部分国产手机按语音键闪退的问题；语音输入改为调用系统语音识别界面，识别完成后自动填入输入框。打赏、更新检查和图片上传保持不变。
 >
 > 1.2.2 更新：新增「打赏支持」，可在设置里查看微信收款码，并一键保存到相册；收款码完全本地显示，不上传任何内容。
@@ -86,6 +88,7 @@ APK：[GitHub Releases v1.2.3](https://github.com/347347ae-design/prochat/releas
 - 回复下方显示耗时、字数、token 用量，可复制 / 重新生成
 - 对话记录存本机文件；API Key 用 Android Keystore AES-GCM 加密后再落盘
 - 设置里可检查更新：读远程版本清单，自动比较 versionCode，显示更新说明并可打开新版下载
+- 升级后第一次打开会显示「更新公告」，也可以在设置里重看
 - Bug 反馈 / 留言板：公开留言、看开发者回复和「已解决」状态；昵称/联系方式选填，联系方式仅管理员可见
 - 打赏支持：设置里显示微信收款码，可直接保存到相册；完全自愿，不影响任何功能
 - 启动时每天自动检查一次更新，可在设置里关闭

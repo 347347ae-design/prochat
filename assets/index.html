@@ -133,6 +133,7 @@
     <div class="section">
       <div class="section-title">更新与反馈</div>
       <button class="listbtn" id="btnCheckUpdate">检查更新</button>
+      <button class="listbtn" id="btnShowNotice">更新公告</button>
       <button class="listbtn" id="btnOpenBoard">Bug 反馈 / 留言板</button>
       <label class="checkrow">
         <input type="checkbox" id="setAutoUpdate">
@@ -346,6 +347,17 @@
   <div class="confirm-actions">
     <button class="ghostbtn" id="btnUpdateLater">稍后</button>
     <button class="primarybtn updbtn" id="btnUpdateNow">去下载</button>
+  </div>
+</div>
+
+<div class="scrim" id="noticeScrim"></div>
+<div class="confirmbox updatebox noticebox" id="noticeBox">
+  <div class="upd-icon">✦</div>
+  <div class="upd-title" id="noticeTitle">更新公告</div>
+  <div class="upd-sub" id="noticeSub"></div>
+  <div class="upd-notes" id="noticeNotes"></div>
+  <div class="confirm-actions">
+    <button class="primarybtn updbtn" id="btnNoticeOk">知道了</button>
   </div>
 </div>
 

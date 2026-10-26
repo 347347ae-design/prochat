@@ -199,6 +199,7 @@
     autoUpdate: true,
     lastUpdateCheck: 0,
     skippedUpdate: 0,
+    noticeVersion: '',
     apiBase: '',
     fbName: '',
     fbContact: ''
@@ -1148,11 +1149,13 @@
       || $('#donatePanel').classList.contains('on')
       || $('#modelSheet').classList.contains('on')
       || $('#confirmBox').classList.contains('on')
+      || $('#noticeBox').classList.contains('on')
       || $('#updateBox').classList.contains('on');
     try { Native.setBackIntercept(open); } catch (e) {}
   }
 
   function closeTop() {
+    if ($('#noticeBox').classList.contains('on')) { closeNotice(true); return; }
     if ($('#updateBox').classList.contains('on')) {
       if (!pendingUpdate || !pendingUpdate.force) closeUpdate(true);
       return;
@@ -1213,6 +1216,20 @@
   let updateChecking = false;
   let pendingUpdate = null;
 
+  // 当前版本更新公告。升级后第一次打开显示一次；设置里也可以手动重看。
+  const RELEASE_NOTICES = {
+    '1.2.4': {
+      title: 'ProChat 1.2.4 更新公告',
+      date: '2026-10-26',
+      notes: [
+        '• 新增更新公告弹窗：升级后第一次打开会显示本次更新内容。',
+        '• 修复部分手机点语音键后闪退的问题。',
+        '• 语音输入改为调用系统语音识别界面，识别完成后自动填入输入框。',
+        '• 打赏支持、检查更新和图片上传保持不变。'
+      ].join('\n')
+    }
+  };
+
   function appInfoSafe() {
     try { return JSON.parse(Native.appInfo()) || {}; } catch (e) { return {}; }
   }
@@ -1251,7 +1268,51 @@
     return String(notes == null ? '' : notes).trim();
   }
 
+  function noticeFor(info) {
+    return RELEASE_NOTICES[String((info && info.version) || '')] || null;
+  }
+
+  function showNotice(force) {
+    const info = appInfoSafe();
+    const ver = String(info.version || '');
+    const notice = noticeFor(info);
+    if (!notice) {
+      if (force) toast('当前版本暂无更新公告');
+      return;
+    }
+    $('#noticeTitle').textContent = notice.title || ('ProChat ' + ver + ' 更新公告');
+    $('#noticeSub').textContent = '当前版本 ' + ver + (notice.date ? ' · ' + notice.date : '');
+    $('#noticeNotes').textContent = notice.notes || '';
+    $('#noticeBox').classList.add('on');
+    $('#noticeScrim').classList.add('on');
+    updateBackIntercept();
+  }
+
+  function closeNotice(seen) {
+    const wasOpen = $('#noticeBox').classList.contains('on');
+    $('#noticeBox').classList.remove('on');
+    $('#noticeScrim').classList.remove('on');
+    if (seen) {
+      const ver = String((appInfoSafe().version) || '');
+      if (ver) {
+        S.settings.noticeVersion = ver;
+        saveSettings();
+      }
+    }
+    if (wasOpen) updateBackIntercept();
+  }
+
+  function maybeShowNotice() {
+    if ($('#noticeBox').classList.contains('on') || $('#updateBox').classList.contains('on')) return;
+    const info = appInfoSafe();
+    const ver = String(info.version || '');
+    if (!ver || S.settings.noticeVersion === ver) return;
+    if (!noticeFor(info)) return;
+    showNotice(false);
+  }
+
   function showUpdate(data, info) {
+    closeNotice(true);
     pendingUpdate = data;
     const name = data.versionName || ('版本 ' + (data.versionCode || ''));
     $('#updTitle').textContent = '发现新版本 ' + name;
@@ -1453,6 +1514,9 @@
   }
 
   $('#btnCheckUpdate').addEventListener('click', () => checkUpdate(false));
+  $('#btnShowNotice').addEventListener('click', () => showNotice(true));
+  $('#btnNoticeOk').addEventListener('click', () => closeNotice(true));
+  $('#noticeScrim').addEventListener('click', () => closeNotice(true));
   $('#btnOpenBoard').addEventListener('click', openBoard);
   $('#btnBoardBack').addEventListener('click', closeBoard);
   $('#btnRefreshBoard').addEventListener('click', loadBoard);
@@ -1984,6 +2048,7 @@
     updateBackIntercept();
 
     if (!S.configs.length) setTimeout(() => toast('先在设置里添加你自己的模型服务'), 700);
+    setTimeout(maybeShowNotice, 1100);
     setTimeout(maybeAutoCheck, 1800);
   }
 
