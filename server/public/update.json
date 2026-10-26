@@ -1,8 +1,8 @@
 {
-  "versionCode": 6,
-  "versionName": "1.2.2",
-  "notes": "新增：打赏支持，可在「设置 → 支持开发」查看微信收款码，并保存到相册。\n优化：适配 Android 10 及以上系统的相册保存；旧系统会在保存时申请存储权限。",
-  "url": "https://ai.h80b5c8fe.nyat.app:21398/prochat/ProChat-1.2.2.apk",
+  "versionCode": 7,
+  "versionName": "1.2.3",
+  "notes": "修复：部分手机（尤其是国产 ROM）点语音键后闪退的问题。\n语音输入改为调用系统语音识别界面，识别完成后自动填入输入框。\n打赏支持、检查更新和图片上传保持不变。",
+  "url": "https://ai.h80b5c8fe.nyat.app:21398/prochat/ProChat-1.2.3.apk",
   "force": false,
-  "publishedAt": "2026-10-26T13:52:47.506Z"
+  "publishedAt": "2026-10-26T14:54:05.812Z"
 }

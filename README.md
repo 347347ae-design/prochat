@@ -4,8 +4,10 @@
 没有内置模型、没有中转服务器、没有账号系统——你说的话和模型的回复只在手机和你填的接口之间流动。
 
 GitHub：<https://github.com/347347ae-design/prochat>
-APK：[GitHub Releases v1.2.2](https://github.com/347347ae-design/prochat/releases/tag/v1.2.2)（约 526 KB），或本地构建输出 `dist/ProChat-1.2.2.apk`
+APK：[GitHub Releases v1.2.3](https://github.com/347347ae-design/prochat/releases/tag/v1.2.3)（约 526 KB），或本地构建输出 `dist/ProChat-1.2.3.apk`
 
+> 1.2.3 更新：修复部分国产手机按语音键闪退的问题；语音输入改为调用系统语音识别界面，识别完成后自动填入输入框。打赏、更新检查和图片上传保持不变。
+>
 > 1.2.2 更新：新增「打赏支持」，可在设置里查看微信收款码，并一键保存到相册；收款码完全本地显示，不上传任何内容。
 >
 > 1.2.1 更新：检查更新和留言板改用固定的 SakuraFrp 地址，不再依赖 Tailscale Funnel；旧默认地址会自动迁移。
@@ -78,7 +80,7 @@ APK：[GitHub Releases v1.2.2](https://github.com/347347ae-design/prochat/releas
 - 代码块带语言标签 + 一键复制
 - `reasoning_content`（DeepSeek R1 等推理模型）折叠显示「思考过程」
 - 图片上传（多模态模型，最多 4 张，自动压缩到 1280px / JPEG）
-- 语音输入（调用系统语音识别，边说边出字）
+- 语音输入（调用系统语音识别界面，识别完成后填入输入框）
 - 系统提示词、上下文条数、温度、最大 tokens 可调
 - 深色 / 浅色 / 跟随系统
 - 回复下方显示耗时、字数、token 用量，可复制 / 重新生成
@@ -175,7 +177,7 @@ SakuraFrp 隧道名 `prochat`，本机服务 `prochat-sakura`，隧道 ID `29674
 
 - 只支持 OpenAI 兼容的 `/chat/completions`；Claude / Gemini 原生协议不在范围内（可以用它们各自的 OpenAI 兼容层或中转）。
 - 图片上传要模型本身支持视觉，不然接口会报错。
-- 语音识别依赖手机上的语音服务（Google 语音服务或厂商自带），没有的话按钮会提示不可用。
+- 语音识别依赖手机上的系统语音识别界面（Google 语音服务或厂商自带），没有的话按钮会提示不可用。
 - 会话记录不加密（只有 API Key 加密），因为要存图片和长文本；敏感内容建议及时清理。
 - 公式渲染使用本地 KaTeX：遇到不支持的 LaTeX 命令会按原文显示，不会让页面报错。
 - 为避免把价格当成公式，`$...$` 会跳过纯数字、代码块和行内代码里的内容；复杂公式建议写在 `$$...$$` 里。

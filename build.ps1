@@ -21,7 +21,7 @@ $keytool = Join-Path $jdk 'bin\keytool.exe'
 $build = Join-Path $root 'build'
 $dist = Join-Path $root 'dist'
 $ks = Join-Path $root 'prochat.jks'
-$apkName = 'ProChat-1.2.2.apk'
+$apkName = 'ProChat-1.2.3.apk'
 
 if (Test-Path $build) { Remove-Item -Recurse -Force $build }
 New-Item -ItemType Directory -Force -Path $build, $dist,

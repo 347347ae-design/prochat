@@ -894,6 +894,7 @@
     },
     onToast(msg) { toast(msg); },
     onVoiceStart() {
+      voiceOn = true;
       $('#btnMic').classList.add('rec');
     },
     onVoice(text, isFinal) {
@@ -902,15 +903,18 @@
       ta.value = voiceBase + text;
       autoGrow();
       if (isFinal) {
+        voiceOn = false;
         $('#btnMic').classList.remove('rec');
         voiceBase = '';
       }
     },
     onVoiceEnd() {
+      voiceOn = false;
       $('#btnMic').classList.remove('rec');
       voiceBase = '';
     },
     onVoiceError(msg) {
+      voiceOn = false;
       $('#btnMic').classList.remove('rec');
       voiceBase = '';
       toast(msg);
@@ -998,8 +1002,8 @@
     voiceOn = true;
     voiceBase = ta.value;
     const lang = S.settings.voiceLang || 'zh-CN';
-    try { Native.startVoice(lang); } catch (e) { toast('语音不可用'); }
-    setTimeout(() => { voiceOn = false; $('#btnMic').classList.remove('rec'); }, 30000);
+    try { Native.startVoice(lang); } catch (e) { voiceOn = false; toast('语音不可用'); }
+    setTimeout(() => { voiceOn = false; $('#btnMic').classList.remove('rec'); }, 120000);
   });
 
   $('#attachBox').addEventListener('click', (e) => {

@@ -2,6 +2,7 @@ package com.local.prochat;
 
 import android.Manifest;
 import android.app.Activity;
+import android.content.ActivityNotFoundException;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.ContentValues;
@@ -40,14 +41,12 @@ import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 
-import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
-import android.speech.SpeechRecognizer;
 
 public class MainActivity extends Activity {
     private static final String TAG = "ProChat";
     private static final int REQ_PICK_IMAGE = 1001;
-    private static final int REQ_MIC = 1002;
+    private static final int REQ_VOICE = 1002;
     private static final int REQ_SAVE_IMAGE = 1003;
 
     private WebView web;
@@ -58,8 +57,6 @@ public class MainActivity extends Activity {
     private final Handler ui = new Handler(Looper.getMainLooper());
     private volatile boolean backIntercept;
 
-    private SpeechRecognizer recognizer;
-    private String pendingVoiceLocale;
     private String pendingSaveAsset;
     private String pendingSaveName;
 
@@ -128,7 +125,7 @@ public class MainActivity extends Activity {
     @Override
     public void onBackPressed() {
         if (backIntercept) {
-            callJs("onBack", null);
+            callJs("onBack");
         } else {
             super.onBackPressed();
         }
@@ -136,13 +133,6 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
-        try {
-            if (recognizer != null) {
-                recognizer.destroy();
-                recognizer = null;
-            }
-        } catch (Throwable ignored) {
-        }
         chat.shutdown();
         if (net != null) {
             net.shutdown();
@@ -162,9 +152,11 @@ public class MainActivity extends Activity {
     void callJs(final String fn, final String... jsonArgs) {
         StringBuilder sb = new StringBuilder("window.ProChatNative&&window.ProChatNative.");
         sb.append(fn).append('(');
-        for (int i = 0; i < jsonArgs.length; i++) {
-            if (i > 0) sb.append(',');
-            sb.append(jsonArgs[i] == null ? "null" : jsonArgs[i]);
+        if (jsonArgs != null) {
+            for (int i = 0; i < jsonArgs.length; i++) {
+                if (i > 0) sb.append(',');
+                sb.append(jsonArgs[i] == null ? "null" : jsonArgs[i]);
+            }
         }
         sb.append(");");
         final String js = sb.toString();
@@ -236,7 +228,8 @@ public class MainActivity extends Activity {
                 o.put("versionCode", Build.VERSION.SDK_INT >= 28 ? pi.getLongVersionCode() : pi.versionCode);
                 o.put("sdk", Build.VERSION.SDK_INT);
                 o.put("model", Build.MANUFACTURER + " " + Build.MODEL);
-                o.put("speech", SpeechRecognizer.isRecognitionAvailable(MainActivity.this));
+                o.put("speech", !MainActivity.this.getPackageManager().queryIntentActivities(
+                        new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH), 0).isEmpty());
                 return o.toString();
             } catch (Throwable t) {
                 return "{}";
@@ -458,7 +451,7 @@ public class MainActivity extends Activity {
             ui.post(new Runnable() {
                 @Override
                 public void run() {
-                    stopVoiceInternal();
+                    callJs("onVoiceEnd");
                 }
             });
         }
@@ -469,6 +462,21 @@ public class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQ_VOICE) {
+            if (resultCode == RESULT_OK && data != null) {
+                java.util.ArrayList<String> list =
+                        data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
+                if (list != null && !list.isEmpty()
+                        && list.get(0) != null && !list.get(0).trim().isEmpty()) {
+                    callJs("onVoice", JSONObject.quote(list.get(0)), "true");
+                } else {
+                    callJs("onVoiceError", JSONObject.quote("没有识别到文字，再说一次"));
+                    return;
+                }
+            }
+            callJs("onVoiceEnd");
+            return;
+        }
         if (requestCode != REQ_PICK_IMAGE || resultCode != RESULT_OK || data == null) return;
         Uri uri = data.getData();
         if (uri == null) return;
@@ -547,44 +555,20 @@ public class MainActivity extends Activity {
     // --------------------------------------------------------------- 语音
 
     private void startVoiceInternal(String locale) {
-        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            pendingVoiceLocale = locale;
-            requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, REQ_MIC);
-            return;
-        }
         try {
-            if (!SpeechRecognizer.isRecognitionAvailable(this)) {
-                callJs("onVoiceError", JSONObject.quote("这台手机没有可用的语音识别服务（需要安装/开启 Google 或厂商的语音服务）"));
-                return;
-            }
-            stopVoiceInternal();
-            recognizer = SpeechRecognizer.createSpeechRecognizer(this);
-            recognizer.setRecognitionListener(new VoiceListener());
             Intent i = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
             i.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
-            i.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
+            i.putExtra(RecognizerIntent.EXTRA_PROMPT, "请说话");
             i.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
-            i.putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, getPackageName());
             if (locale != null && !locale.isEmpty() && !"auto".equals(locale)) {
                 i.putExtra(RecognizerIntent.EXTRA_LANGUAGE, locale);
             }
-            recognizer.startListening(i);
+            callJs("onVoiceStart");
+            startActivityForResult(i, REQ_VOICE);
+        } catch (ActivityNotFoundException e) {
+            callJs("onVoiceError", JSONObject.quote("这台手机没有可用的语音识别应用，请安装系统语音服务"));
         } catch (Throwable t) {
             callJs("onVoiceError", JSONObject.quote("语音识别启动失败：" + t.getMessage()));
-        }
-    }
-
-    private void stopVoiceInternal() {
-        if (recognizer != null) {
-            try {
-                recognizer.cancel();
-            } catch (Throwable ignored) {
-            }
-            try {
-                recognizer.destroy();
-            } catch (Throwable ignored) {
-            }
-            recognizer = null;
         }
     }
 
@@ -652,90 +636,6 @@ public class MainActivity extends Activity {
                 toast("没有存储权限，无法保存收款码");
             }
             return;
-        }
-        if (requestCode != REQ_MIC) return;
-        if (granted) {
-            startVoiceInternal(pendingVoiceLocale);
-        } else {
-            callJs("onVoiceError", JSONObject.quote("没有麦克风权限，无法语音输入"));
-        }
-    }
-
-    private class VoiceListener implements RecognitionListener {
-        private void emit(Bundle results, boolean isFinal) {
-            if (results == null) return;
-            java.util.ArrayList<String> list =
-                    results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
-            if (list == null || list.isEmpty()) return;
-            callJs("onVoice", JSONObject.quote(list.get(0)), isFinal ? "true" : "false");
-        }
-
-        @Override
-        public void onReadyForSpeech(Bundle params) {
-            callJs("onVoiceStart", null);
-        }
-
-        @Override
-        public void onBeginningOfSpeech() {
-        }
-
-        @Override
-        public void onRmsChanged(float rmsdB) {
-        }
-
-        @Override
-        public void onBufferReceived(byte[] buffer) {
-        }
-
-        @Override
-        public void onEndOfSpeech() {
-        }
-
-        @Override
-        public void onError(int error) {
-            callJs("onVoiceError", JSONObject.quote(voiceErrorText(error)));
-            stopVoiceInternal();
-        }
-
-        @Override
-        public void onResults(Bundle results) {
-            emit(results, true);
-            callJs("onVoiceEnd", null);
-            stopVoiceInternal();
-        }
-
-        @Override
-        public void onPartialResults(Bundle partialResults) {
-            emit(partialResults, false);
-        }
-
-        @Override
-        public void onEvent(int eventType, Bundle params) {
-        }
-    }
-
-    private static String voiceErrorText(int error) {
-        switch (error) {
-            case SpeechRecognizer.ERROR_AUDIO:
-                return "录音出错了，检查一下麦克风";
-            case SpeechRecognizer.ERROR_CLIENT:
-                return "语音识别客户端错误";
-            case SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS:
-                return "没有麦克风权限";
-            case SpeechRecognizer.ERROR_NETWORK:
-                return "语音识别需要联网，请检查网络";
-            case SpeechRecognizer.ERROR_NETWORK_TIMEOUT:
-                return "语音识别网络超时";
-            case SpeechRecognizer.ERROR_NO_MATCH:
-                return "没听清，再说一次";
-            case SpeechRecognizer.ERROR_RECOGNIZER_BUSY:
-                return "识别器忙，稍后再试";
-            case SpeechRecognizer.ERROR_SERVER:
-                return "语音服务返回错误";
-            case SpeechRecognizer.ERROR_SPEECH_TIMEOUT:
-                return "没听到声音";
-            default:
-                return "语音识别出错（" + error + "）";
         }
     }
 }
