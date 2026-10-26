@@ -1,0 +1,4 @@
+{
+  "adminToken": "change-me-to-a-long-random-token",
+  "publicBase": "https://example.com/prochat"
+}

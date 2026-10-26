@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover,interactive-widget=resizes-content">
+<meta name="color-scheme" content="dark light">
+<title>ProChat</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="katex/katex.min.css">
+</head>
+<body>
+
+<div id="app">
+  <header class="topbar">
+    <button class="iconbtn" id="btnMenu" aria-label="会话">
+      <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+    </button>
+    <div class="titlebox" id="titleBox">
+      <div class="t1" id="convTitle">新对话</div>
+      <div class="t2" id="convModel">未配置模型</div>
+    </div>
+    <button class="iconbtn" id="btnNew" aria-label="新对话">
+      <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+    </button>
+  </header>
+
+  <main id="scroll">
+    <div id="empty" class="empty">
+      <div class="orb"><svg viewBox="0 0 24 24"><path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.5 8.9 8.9 0 0 1-3.9-.9L3 21l1.9-5.3A8.4 8.4 0 0 1 4 11.5 8.4 8.4 0 0 1 12.5 3 8.4 8.4 0 0 1 21 11.5z"/></svg></div>
+      <h1>有什么可以帮你？</h1>
+      <p class="sub">用你自己的 API Key，直连你自己买的模型</p>
+      <div class="chips" id="chips"></div>
+      <button class="cta hidden" id="btnSetup">添加模型服务 →</button>
+    </div>
+    <div id="messages"></div>
+    <div class="scrollpad"></div>
+  </main>
+
+  <footer id="composer">
+    <div class="attachbox" id="attachBox"></div>
+    <div class="inputrow" id="inputRow">
+      <button class="iconbtn sm" id="btnImage" aria-label="图片">
+        <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="8.5" cy="9.5" r="1.6"/><path d="M21 16l-4.5-4.5L7 20"/></svg>
+      </button>
+      <textarea id="ta" rows="1" placeholder="发消息…" enterkeyhint="enter"></textarea>
+      <button class="iconbtn sm" id="btnMic" aria-label="语音">
+        <svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+      </button>
+      <button class="sendbtn" id="btnSend" aria-label="发送">
+        <svg viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg>
+      </button>
+      <button class="sendbtn stop hidden" id="btnStop" aria-label="停止">
+        <svg viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor" stroke="none"/></svg>
+      </button>
+    </div>
+    <div class="hint" id="hint"></div>
+  </footer>
+</div>
+
+<!-- 会话抽屉 -->
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-head">
+    <div class="brand"><span class="branddot"></span>ProChat</div>
+    <button class="iconbtn sm" id="btnSettings" aria-label="设置">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v2.2M12 19.3v2.2M4.2 4.2l1.6 1.6M18.2 18.2l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.2 19.8l1.6-1.6M18.2 5.8l1.6-1.6"/></svg>
+    </button>
+  </div>
+  <button class="newchat" id="btnNewChat"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>新对话</button>
+  <div class="convlist" id="convList"></div>
+  <div class="drawer-foot">
+    <div id="cfgSummary" class="cfgsum">未配置模型</div>
+    <button class="ghostbtn" id="btnSettings2">设置</button>
+  </div>
+</aside>
+
+<!-- 设置 -->
+<section class="panel" id="settingsPanel">
+  <header class="panel-head">
+    <button class="iconbtn sm" id="btnSetBack" aria-label="返回">
+      <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>
+    </button>
+    <div class="panel-title">设置</div>
+    <div class="headspacer"></div>
+  </header>
+  <div class="panel-body">
+    <div class="section">
+      <div class="section-title">模型服务</div>
+      <div class="cfglist" id="cfgList"></div>
+      <button class="addcfg" id="btnAddCfg">＋ 添加模型服务</button>
+      <p class="note">Key 只会保存在本机，用系统 Keystore 加密。所有请求直接从手机发给你填的接口地址。</p>
+    </div>
+
+    <div class="section">
+      <div class="section-title">对话默认</div>
+      <label class="field">
+        <span>系统提示词</span>
+        <textarea id="setSys" rows="3" placeholder="例如：你是简洁、直接的中文助手，回答尽量短。"></textarea>
+      </label>
+      <div class="row2">
+        <label class="field">
+          <span>带上多少条上下文</span>
+          <input id="setCtx" type="number" inputmode="numeric" min="2" max="80" step="2">
+        </label>
+        <label class="field">
+          <span>最大回复 tokens</span>
+          <input id="setMax" type="number" inputmode="numeric" min="0" placeholder="默认">
+        </label>
+      </div>
+      <label class="field">
+        <span>温度 <b id="tempVal">0.7</b><em class="dim">越低越稳，越高越发散</em></span>
+        <input id="setTemp" type="range" min="0" max="2" step="0.1">
+      </label>
+    </div>
+
+    <div class="section">
+      <div class="section-title">外观</div>
+      <div class="segmented" id="themeSeg">
+        <button data-v="auto">跟随系统</button>
+        <button data-v="light">浅色</button>
+        <button data-v="dark">深色</button>
+      </div>
+      <label class="field">
+        <span>语音识别语言</span>
+        <select id="setLang">
+          <option value="auto">跟随系统</option>
+          <option value="zh-CN">普通话</option>
+          <option value="en-US">English</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="section">
+      <div class="section-title">更新与反馈</div>
+      <button class="listbtn" id="btnCheckUpdate">检查更新</button>
+      <button class="listbtn" id="btnOpenBoard">Bug 反馈 / 留言板</button>
+      <label class="checkrow">
+        <input type="checkbox" id="setAutoUpdate">
+        <span>启动时自动检查更新</span>
+      </label>
+      <p class="note" id="updateStatus">当前版本 …</p>
+      <details class="adv">
+        <summary>高级：更新 / 留言服务地址</summary>
+        <label class="field">
+          <span>后端地址</span>
+          <input id="setApiBase" type="url" placeholder="https://..." autocapitalize="off" spellcheck="false">
+        </label>
+        <button class="ghostbtn tiny" id="btnSaveApiBase">保存地址</button>
+        <p class="note">一般不用改。只有你换了后端服务器才需要改。</p>
+      </details>
+    </div>
+
+    <div class="section">
+      <div class="section-title">支持开发</div>
+      <button class="listbtn donate-entry" id="btnDonate">
+        <span class="donate-entry-heart">♥</span>
+        <span>打赏支持 · 请我喝杯咖啡</span>
+      </button>
+      <p class="note">如果 ProChat 帮到了你，可以自愿打赏；不打赏也完全不影响任何功能。</p>
+    </div>
+
+    <div class="section">
+      <div class="section-title">数据</div>
+      <button class="listbtn" id="btnShareConv">分享当前对话（Markdown）</button>
+      <button class="listbtn" id="btnClearConvs">清空所有对话</button>
+      <button class="listbtn danger" id="btnWipe">清除全部数据（含 Key）</button>
+    </div>
+
+    <div class="section">
+      <div class="section-title">关于</div>
+      <p class="note" id="aboutText">ProChat · 本地直连版</p>
+      <p class="note">这个 App 不含任何内置模型。你的对话只会发到你配置的模型接口；检查更新和留言板会连接你自己的 ProChat 后端，不会上传聊天内容。</p>
+    </div>
+  </div>
+</section>
+
+<!-- 打赏支持 -->
+<section class="panel" id="donatePanel">
+  <header class="panel-head">
+    <button class="iconbtn sm" id="btnDonateBack" aria-label="返回">
+      <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>
+    </button>
+    <div class="panel-title">打赏支持</div>
+    <div class="headspacer"></div>
+  </header>
+  <div class="panel-body donate-body">
+    <div class="donate-head">
+      <div class="donate-heart">♥</div>
+      <h2>请我喝杯咖啡</h2>
+      <p>如果 ProChat 对你有帮助，欢迎用微信扫码打赏。完全自愿，不影响任何功能。</p>
+    </div>
+    <div class="donate-card">
+      <img src="donate-wechat.jpg" alt="微信支付收款码">
+      <div class="donate-pay">微信支付 · 三四七(**齐)</div>
+    </div>
+    <button class="primarybtn" id="btnSaveDonate">保存收款码到相册</button>
+    <p class="note">保存后可在微信「扫一扫 → 相册」中选择；也可以直接用另一台手机扫码。</p>
+    <p class="note">打赏是自愿赠与，不购买任何服务，也不会解锁额外功能。请确认收款人姓名后再支付。</p>
+  </div>
+</section>
+
+<!-- 配置编辑 -->
+<section class="panel" id="cfgPanel">
+  <header class="panel-head">
+    <button class="iconbtn sm" id="btnCfgBack" aria-label="返回">
+      <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>
+    </button>
+    <div class="panel-title" id="cfgPanelTitle">添加模型服务</div>
+    <div class="headspacer"></div>
+  </header>
+  <div class="panel-body">
+    <div class="section">
+      <div class="section-title">快速选择服务商</div>
+      <div class="presets" id="presets"></div>
+      <div class="pv hidden" id="presetInfo">
+        <div class="pv-head">
+          <span class="pv-name" id="pvName"></span>
+          <span class="pv-note" id="pvNote"></span>
+        </div>
+        <div class="pv-links">
+          <button class="linkbtn" id="pvKey" data-url="">获取 API Key ↗</button>
+          <button class="linkbtn" id="pvBuy" data-url="">充值 / 购买 ↗</button>
+        </div>
+        <div class="pv-mwrap" id="pvMWrap">
+          <div class="pv-mlabel">内置常用模型（点一下直接填入）</div>
+          <div class="pv-models" id="pvModels"></div>
+        </div>
+      </div>
+      <p class="note">选一个会自动填好接口地址和常用模型，贴 API Key 就能用。购买和充值都在厂商官网完成，App 不参与交易。</p>
+    </div>
+
+    <div class="section">
+      <label class="field">
+        <span>名称</span>
+        <input id="cfgName" type="text" placeholder="随便起，比如 DeepSeek">
+      </label>
+      <label class="field">
+        <span>接口地址 <em class="dim">Base URL</em></span>
+        <input id="cfgBase" type="url" placeholder="https://api.deepseek.com" autocapitalize="off" spellcheck="false">
+      </label>
+      <label class="field">
+        <span>API Key</span>
+        <div class="keyrow">
+          <input id="cfgKey" type="password" placeholder="sk-..." autocapitalize="off" spellcheck="false">
+          <button class="ghostbtn tiny" id="btnEye">显示</button>
+        </div>
+      </label>
+      <div class="field">
+        <span>模型名</span>
+        <div class="keyrow">
+          <input id="cfgModel" type="text" placeholder="deepseek-flash" autocapitalize="off" spellcheck="false">
+          <button class="ghostbtn tiny" id="btnPickModel">选择</button>
+        </div>
+        <p class="fieldhint">可以手填；点「选择」看内置模型，或 <button class="linkbtn inline" id="btnFetch">从账号拉取完整列表</button>。</p>
+      </div>
+      <details class="adv">
+        <summary>高级：自定义请求头</summary>
+        <textarea id="cfgHeaders" rows="3" placeholder='{"HTTP-Referer":"https://example.com"}' spellcheck="false"></textarea>
+        <p class="note">JSON 对象格式。有些中转站/OpenRouter 需要额外请求头时填这里。</p>
+      </details>
+      <button class="primarybtn" id="btnCfgSave">保存并使用</button>
+      <button class="listbtn danger hidden" id="btnCfgDelete">删除这个服务</button>
+    </div>
+  </div>
+</section>
+
+<!-- Bug 反馈 / 留言板 -->
+<section class="panel" id="boardPanel">
+  <header class="panel-head">
+    <button class="iconbtn sm" id="btnBoardBack" aria-label="返回">
+      <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>
+    </button>
+    <div class="panel-title">Bug 反馈 / 留言板</div>
+    <div class="headspacer"></div>
+  </header>
+  <div class="panel-body">
+    <div class="section">
+      <p class="note board-note">
+        留言内容会公开显示；昵称和联系方式选填，联系方式只有管理员能看到。
+        <b>不要填写 API Key、密码、聊天隐私。</b>
+      </p>
+      <div class="board-actions">
+        <button class="primarybtn small" id="btnNewFeedback">写留言</button>
+        <button class="ghostbtn" id="btnRefreshBoard">刷新</button>
+      </div>
+
+      <div id="fbForm" class="fbform hidden">
+        <label class="field">
+          <span>昵称 <em class="dim">选填</em></span>
+          <input id="fbName" type="text" maxlength="20" placeholder="匿名用户" autocapitalize="off" spellcheck="false">
+        </label>
+        <label class="field">
+          <span>联系方式 <em class="dim">选填，仅管理员可见</em></span>
+          <input id="fbContact" type="text" maxlength="120" placeholder="QQ / 邮箱，方便联系你" autocapitalize="off" spellcheck="false">
+        </label>
+        <label class="field">
+          <span>留言内容</span>
+          <textarea id="fbContent" rows="5" maxlength="2000" placeholder="遇到了什么问题？写清楚复现步骤、机型和 App 版本，更容易定位。"></textarea>
+          <span class="counter" id="fbCount">0 / 2000</span>
+        </label>
+        <input id="fbWebsite" class="hp" type="text" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <div class="fbform-actions">
+          <button class="ghostbtn" id="btnCancelFeedback">取消</button>
+          <button class="primarybtn" id="btnSubmitFeedback">发布留言</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="boardList" class="boardlist">
+      <div class="boardempty">打开留言板后加载…</div>
+    </div>
+  </div>
+</section>
+
+<!-- 模型选择 -->
+<div class="scrim" id="sheetScrim"></div>
+<div class="sheet" id="modelSheet">
+  <div class="sheet-head">
+    <div class="sheet-headtext">
+      <div class="sheet-title">选择模型</div>
+      <div class="sheet-sub" id="sheetHint"></div>
+    </div>
+    <button class="ghostbtn tiny" id="btnSheetFetch">从账号拉取</button>
+    <button class="iconbtn sm" id="btnSheetClose">
+      <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </div>
+  <div class="modellist" id="modelList"></div>
+</div>
+
+<div class="scrim" id="confirmScrim"></div>
+<div class="confirmbox" id="confirmBox">
+  <div class="confirm-text" id="confirmText"></div>
+  <div class="confirm-actions">
+    <button class="ghostbtn" id="confirmCancel">取消</button>
+    <button class="dangerbtn" id="confirmOk">确定</button>
+  </div>
+</div>
+
+<div class="scrim" id="updateScrim"></div>
+<div class="confirmbox updatebox" id="updateBox">
+  <div class="upd-icon">↑</div>
+  <div class="upd-title" id="updTitle">发现新版本</div>
+  <div class="upd-sub" id="updSub"></div>
+  <div class="upd-notes" id="updNotes"></div>
+  <div class="confirm-actions">
+    <button class="ghostbtn" id="btnUpdateLater">稍后</button>
+    <button class="primarybtn updbtn" id="btnUpdateNow">去下载</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="katex/katex.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
