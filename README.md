@@ -4,7 +4,7 @@
 没有内置模型、没有中转服务器、没有账号系统——你说的话和模型的回复只在手机和你填的接口之间流动。
 
 GitHub：<https://github.com/347347ae-design/prochat>
-APK：GitHub Releases `v1.2.2`（约 526 KB），或本地构建输出 `dist/ProChat-1.2.2.apk`
+APK：[GitHub Releases v1.2.2](https://github.com/347347ae-design/prochat/releases/tag/v1.2.2)（约 526 KB），或本地构建输出 `dist/ProChat-1.2.2.apk`
 
 > 1.2.2 更新：新增「打赏支持」，可在设置里查看微信收款码，并一键保存到相册；收款码完全本地显示，不上传任何内容。
 >
@@ -133,6 +133,8 @@ prochat/
 ```
 
 > 仓库不包含 `prochat.jks`、`server/config.json`、`server-admin.txt`、`build.local.ps1`、`build/`、`dist/` 和 APK 构建产物。
+
+推送 `v*` 标签会触发 `.github/workflows/release.yml`：从固定地址下载 APK、校验 SHA-256，然后自动创建 GitHub Release。
 
 打包（Windows，需要 JDK 17 + Android SDK build-tools 34）：
 

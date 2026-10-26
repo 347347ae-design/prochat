@@ -17,18 +17,32 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Resolve version
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
       - name: Download and verify APK
         run: |
-          curl -fsSL --retry 3 --retry-delay 3 \
-            -o ProChat-1.2.2.apk \
-            "https://ai.h80b5c8fe.nyat.app:21398/prochat/ProChat-1.2.2.apk"
-          echo "D4A9683C998CBDED75B36909D56E9928C93B36AB899E481A1660431566A71277  ProChat-1.2.2.apk" | sha256sum -c -
+          VERSION="${{ steps.version.outputs.version }}"
+          APK="ProChat-${VERSION}.apk"
+          BASE="https://ai.h80b5c8fe.nyat.app:21398/prochat"
+          SUM_FILE=".github/checksums/${GITHUB_REF_NAME}.sha256"
+          NOTES_FILE=".github/release-notes-${VERSION}.md"
+
+          curl -fsSL --retry 3 --retry-delay 3 -o "$APK" "$BASE/$APK"
+          test -f "$SUM_FILE"
+          test -f "$NOTES_FILE"
+          sha256sum -c "$SUM_FILE"
 
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${GITHUB_REF_NAME}" ProChat-1.2.2.apk \
-            --title "ProChat 1.2.2" \
-            --notes-file .github/release-notes-1.2.2.md \
+          VERSION="${{ steps.version.outputs.version }}"
+          APK="ProChat-${VERSION}.apk"
+          NOTES_FILE=".github/release-notes-${VERSION}.md"
+
+          gh release create "${GITHUB_REF_NAME}" "$APK" \
+            --title "ProChat ${VERSION}" \
+            --notes-file "$NOTES_FILE" \
             --latest
