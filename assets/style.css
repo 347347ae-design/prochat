@@ -606,6 +606,13 @@ input[type=range]::-webkit-slider-thumb {
 }
 .listbtn:active { background: var(--bg-elev2); }
 .listbtn.danger { color: var(--danger); }
+/* 已经发现有新版本时，检查更新按钮高亮一下 */
+.listbtn.has-update {
+  color: var(--accent);
+  border-color: rgba(76, 141, 255, .45);
+  background: linear-gradient(135deg, rgba(76, 141, 255, .12), rgba(139, 92, 246, .12));
+  font-weight: 600;
+}
 .donate-entry {
   display: flex; align-items: center; gap: 10px;
   background: linear-gradient(135deg, rgba(76, 141, 255, .10), rgba(139, 92, 246, .10));

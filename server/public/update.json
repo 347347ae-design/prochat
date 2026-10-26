@@ -1,8 +1,8 @@
 {
-  "versionCode": 9,
-  "versionName": "1.2.5",
-  "notes": "语音输入默认改为接口转写，不再依赖谷歌语音服务，支持硅基流动 SenseVoice、OpenAI Whisper 等兼容接口。\n屏幕左右边缘向内滑动可以返回上一页。\n1.2.4 的更新公告、打赏和图片上传保持不变。",
-  "url": "https://ai.h80b5c8fe.nyat.app:21398/prochat/ProChat-1.2.5.apk",
+  "versionCode": 10,
+  "versionName": "1.2.6",
+  "notes": "修「更新提示不及时」：启动就检查更新，从后台切回来也会再查；检查失败不再锁一整天，下次打开自动重试；点过「稍后」的版本 3 天后会再提醒。\n设置里的「检查更新」发现有新版会直接高亮成「有新版本 x.x.x，查看」。\n全新安装不再弹「更新公告」，只有从旧版本升上来才显示。",
+  "url": "https://ai.h80b5c8fe.nyat.app:21398/prochat/ProChat-1.2.6.apk",
   "force": false,
-  "publishedAt": "2026-10-26T15:20:42.316Z"
+  "publishedAt": "2026-10-26T16:09:34.246Z"
 }

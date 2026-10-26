@@ -6,9 +6,11 @@
 有安卓 App 和网页版（iPhone 用这个）两套壳，界面和逻辑完全共用。
 
 GitHub：<https://github.com/347347ae-design/prochat>
-APK：[GitHub Releases v1.2.5](https://github.com/347347ae-design/prochat/releases/tag/v1.2.5)（约 530 KB），或本地构建输出 `dist/ProChat-1.2.5.apk`
+APK：[GitHub Releases v1.2.6](https://github.com/347347ae-design/prochat/releases/tag/v1.2.6)（约 546 KB），或本地构建输出 `dist/ProChat-1.2.6.apk`
 网页版：<https://ai.h80b5c8fe.nyat.app:21398/prochat/app/>（iPhone 加到主屏幕即可当 App 用）
 
+> 1.2.6 更新：修「更新提示不及时」。启动就检查更新（以前要隔 24 小时），从后台切回来也会查；检查失败不再锁一整天；点过「稍后」的版本 3 天后会再提醒；设置里的「检查更新」发现有新版会直接高亮成「有新版本 x.x.x，查看」。另外全新安装不再弹「更新公告」，只有真正从旧版本升上来才显示。
+>
 > 1.2.5 更新：语音输入默认改为接口转写，不再依赖谷歌语音服务；支持硅基流动 SenseVoice、OpenAI Whisper 等 OpenAI 兼容转写接口。屏幕左右边缘向内滑动可以返回上一页。1.2.4 的更新公告、打赏和图片上传保持不变。
 >
 > 网页版（同一份代码）：新增 `web.js`，在浏览器里用 fetch + ReadableStream 复刻原生桥，流式对话、图片上传、语音转写、返回手势全部可用；可添加到主屏幕，离线也能打开界面。详见[网页版 / iPhone](#网页版--iphone)。
@@ -217,7 +219,8 @@ Copy-Item .\build.local.example.ps1 .\build.local.ps1
 powershell -ExecutionPolicy Bypass -File .\build.ps1
 ```
 
-不依赖 Gradle，所以整个构建几秒钟完成，APK 只有 530 KB 左右（其中约 250 KB 是离线公式字体，约 150 KB 是打赏收款码）。
+不依赖 Gradle，所以整个构建几秒钟完成，APK 只有 546 KB 左右（其中约 250 KB 是离线公式字体，约 150 KB 是打赏收款码）。
+`assets/icons/` 是给网页版用的 PWA 图标，打包时会被跳过，安卓用的是 `res/mipmap`。
 `prochat.jks` 是本次使用的签名文件，**仓库不包含它**；以后升级必须用同一个文件签名，
 否则不能覆盖安装。想换成自己的签名，生成新的 keystore 后重新打包即可。不要把 keystore、口令或 `build.local.ps1` 提交到仓库。
 

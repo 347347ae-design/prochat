@@ -14,7 +14,7 @@
   if (/(?:^|[?&])mock=1(?:&|$)/.test(location.search)) return; // 设计预览
 
   var P = 'pc:';
-  var VERSION = '1.2.5';
+  var VERSION = '1.2.6';
   var IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   var STANDALONE = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||

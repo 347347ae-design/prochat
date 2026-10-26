@@ -208,7 +208,10 @@
     autoUpdate: true,
     lastUpdateCheck: 0,
     skippedUpdate: 0,
+    skippedAt: 0,
+    knownUpdate: null,
     noticeVersion: '',
+    seenVersion: '',
     apiBase: '',
     fbName: '',
     fbContact: ''
@@ -1328,6 +1331,18 @@
 
   // 当前版本更新公告。升级后第一次打开显示一次；设置里也可以手动重看。
   const RELEASE_NOTICES = {
+    '1.2.6': {
+      title: 'ProChat 1.2.6 更新公告',
+      date: '2026-10-27',
+      notes: [
+        '• 启动就检查更新：以前要隔 24 小时才查一次，现在每次打开都会查。',
+        '• 从后台切回前台也会再查一次；检查失败不再锁一整天，下次打开自动重试。',
+        '• 点过「稍后」的版本，3 天后会再提醒一次，不再永远不提醒。',
+        '• 设置里的「检查更新」会直接显示「有新版本 x.x.x，查看」，点一下就能看说明。',
+        '• 全新安装不再弹「更新公告」——没更新过就不该看到更新公告。',
+        '• 网页版同步更新，iPhone 刷新页面即可。'
+      ].join('\n')
+    },
     '1.2.5': {
       title: 'ProChat 1.2.5 更新公告',
       date: '2026-10-26',
@@ -1376,11 +1391,20 @@
   function refreshUpdateStatus() {
     const info = appInfoSafe();
     const last = Number(S.settings.lastUpdateCheck) || 0;
+    const ku = knownUpdateNewer(info);
     let s = '当前版本 ' + (info.version || '?');
     if (info.versionCode) s += ' (' + info.versionCode + ')';
     s += S.settings.autoUpdate === false ? ' · 自动检查已关闭' : ' · 自动检查已开启';
     if (last) s += ' · 上次检查 ' + fmtWhen(last);
+    if (ku) s += ' · 有新版本 ' + (ku.name || ku.code);
     $('#updateStatus').textContent = s;
+
+    // 已经知道有新版时，按钮直接变成"下载新版本"，点一下就能看到说明
+    const btn = $('#btnCheckUpdate');
+    if (btn && !btn.disabled) {
+      btn.textContent = ku ? ('有新版本 ' + (ku.name || ku.code) + '，查看') : '检查更新';
+      btn.classList.toggle('has-update', !!ku);
+    }
   }
 
   function notesText(notes) {
@@ -1416,6 +1440,7 @@
       const ver = String((appInfoSafe().version) || '');
       if (ver) {
         S.settings.noticeVersion = ver;
+        S.settings.seenVersion = ver;
         saveSettings();
       }
     }
@@ -1426,8 +1451,20 @@
     if ($('#noticeBox').classList.contains('on') || $('#updateBox').classList.contains('on')) return;
     const info = appInfoSafe();
     const ver = String(info.version || '');
-    if (!ver || S.settings.noticeVersion === ver) return;
+    if (!ver) return;
+
+    // 全新安装不弹"更新公告"——本来就没更新过，弹出来只会让人困惑
+    const prev = String(S.settings.seenVersion || '');
+    if (!prev) {
+      S.settings.seenVersion = ver;
+      saveSettings();
+      return;
+    }
+    if (S.settings.noticeVersion === ver) return;
     if (!noticeFor(info)) return;
+
+    S.settings.seenVersion = ver;
+    saveSettings();
     showNotice(false);
   }
 
@@ -1451,6 +1488,7 @@
     $('#updateScrim').classList.remove('on');
     if (later && pendingUpdate && Number(pendingUpdate.versionCode)) {
       S.settings.skippedUpdate = Number(pendingUpdate.versionCode);
+      S.settings.skippedAt = Date.now();
       saveSettings();
     }
     pendingUpdate = null;
@@ -1475,41 +1513,76 @@
     }
   }
 
+  // 同一个版本点过「稍后」，隔几天再提醒，而不是永远不提醒
+  const SNOOZE_MS = 3 * 24 * 3600 * 1000;
+  // 一次使用中最多查一次，避免来回切页面时反复请求
+  const CHECK_GAP = 10 * 60 * 1000;
+
+  function snoozed(code) {
+    if (Number(S.settings.skippedUpdate) !== Number(code)) return false;
+    const at = Number(S.settings.skippedAt) || 0;
+    return !!at && Date.now() - at < SNOOZE_MS;
+  }
+
+  function knownUpdateNewer(info) {
+    const ku = S.settings.knownUpdate;
+    if (!ku || !ku.data) return null;
+    const mCode = Number(ku.code) || 0;
+    const cur = Number(info.versionCode) || 0;
+    const newer = (mCode && cur) ? (mCode > cur) : (cmpVersion(ku.name, info.version) > 0);
+    return newer ? ku : null;
+  }
+
   function checkUpdate(silent) {
-    if (updateChecking) return Promise.resolve();
+    if (updateChecking) return Promise.resolve(false);
     updateChecking = true;
     const info = appInfoSafe();
-    S.settings.lastUpdateCheck = Date.now();
-    saveSettings();
-    refreshUpdateStatus();
     const btn = $('#btnCheckUpdate');
     if (btn) { btn.disabled = true; btn.textContent = '检查中…'; }
     if (!silent) toast('正在检查更新…');
 
     return nativeApi(apiBase() + '/update.json').then((data) => {
       updateChecking = false;
-      if (btn) { btn.disabled = false; btn.textContent = '检查更新'; }
+      if (btn) btn.disabled = false;
+      // 只有成功才记时间；失败的话下次打开还会重试
+      S.settings.lastUpdateCheck = Date.now();
       const mCode = Number(data.versionCode) || 0;
       const curCode = Number(info.versionCode) || 0;
       const newer = (mCode && curCode) ? (mCode > curCode) : (cmpVersion(data.versionName, info.version) > 0);
       if (!newer) {
+        S.settings.knownUpdate = null;
+        saveSettings();
+        refreshUpdateStatus();
         if (!silent) toast('已是最新版本');
-        return;
+        return false;
       }
-      if (silent && Number(S.settings.skippedUpdate) === mCode) return;
+      // 记下"有新版"，设置页和按钮上都能看到，不用再查一次
+      S.settings.knownUpdate = {
+        code: mCode,
+        name: String(data.versionName || ''),
+        data: data,
+        at: Date.now()
+      };
+      saveSettings();
+      refreshUpdateStatus();
+      if (silent && snoozed(mCode)) return false;
       showUpdate(data, info);
+      return true;
     }).catch((e) => {
       updateChecking = false;
-      if (btn) { btn.disabled = false; btn.textContent = '检查更新'; }
+      if (btn) btn.disabled = false;
       refreshUpdateStatus();
       if (!silent) toast('检查更新失败：' + e.message);
+      return false;
     });
   }
 
   function maybeAutoCheck() {
+    if (IS_WEB) return;
     if (S.settings.autoUpdate === false) return;
+    if (updateChecking) return;
     const last = Number(S.settings.lastUpdateCheck) || 0;
-    if (Date.now() - last < 24 * 3600 * 1000) return;
+    if (last && Date.now() - last < CHECK_GAP) return;
     checkUpdate(true);
   }
 
@@ -1633,7 +1706,13 @@
     });
   }
 
-  $('#btnCheckUpdate').addEventListener('click', () => checkUpdate(false));
+  $('#btnCheckUpdate').addEventListener('click', () => {
+    const info = appInfoSafe();
+    const ku = knownUpdateNewer(info);
+    // 已经知道有新版就直接弹说明，不用再等一次请求
+    if (ku) { showUpdate(ku.data, info); return; }
+    checkUpdate(false);
+  });
   $('#btnShowNotice').addEventListener('click', () => showNotice(true));
   $('#btnNoticeOk').addEventListener('click', () => closeNotice(true));
   $('#noticeScrim').addEventListener('click', () => closeNotice(true));
@@ -2217,10 +2296,10 @@
     updateBackIntercept();
 
     if (!S.configs.length) setTimeout(() => toast('先在设置里添加你自己的模型服务'), 700);
-    setTimeout(maybeShowNotice, 1100);
 
     if (IS_WEB) {
-      // 网页版没有 APK 可更新，藏掉检查更新；并说明 Key 的存放位置
+      // 网页版刷新即最新，不需要检查更新，只提示当前版本的公告
+      setTimeout(maybeShowNotice, 1100);
       const bu = $('#btnCheckUpdate');
       if (bu) bu.classList.add('hidden');
       const kn = $('#keyNote');
@@ -2232,7 +2311,16 @@
           + '公用设备用完请在设置里清除数据，或直接关掉浏览器。</p>');
       }
     } else {
-      setTimeout(maybeAutoCheck, 1800);
+      // 启动先查更新：有新版本立刻弹窗；没有新版本再补上「本次更新公告」
+      setTimeout(() => {
+        checkUpdate(true).then((shown) => {
+          if (!shown) maybeShowNotice();
+        }).catch(() => maybeShowNotice());
+      }, 900);
+      // 从后台切回来时再查一次（10 分钟内不重复请求）
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') maybeAutoCheck();
+      });
     }
   }
 

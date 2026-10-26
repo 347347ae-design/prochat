@@ -21,7 +21,7 @@ $keytool = Join-Path $jdk 'bin\keytool.exe'
 $build = Join-Path $root 'build'
 $dist = Join-Path $root 'dist'
 $ks = Join-Path $root 'prochat.jks'
-$apkName = 'ProChat-1.2.5.apk'
+$apkName = 'ProChat-1.2.6.apk'
 
 if (Test-Path $build) { Remove-Item -Recurse -Force $build }
 New-Item -ItemType Directory -Force -Path $build, $dist,
@@ -73,6 +73,8 @@ foreach ($e in $oldAssets) { $e.Delete() }
 $assetRoot = Join-Path $root 'assets'
 Get-ChildItem -Recurse -File $assetRoot | ForEach-Object {
     $rel = $_.FullName.Substring($assetRoot.Length + 1).Replace('\', '/')
+    # PWA 图标只给网页版用，安卓走 res/mipmap，不必打进 APK
+    if ($rel -like 'icons/*') { return }
     [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
         $zip, $_.FullName, ('assets/' + $rel),
         [System.IO.Compression.CompressionLevel]::Optimal) | Out-Null
