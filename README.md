@@ -134,7 +134,7 @@ prochat/
 
 > 仓库不包含 `prochat.jks`、`server/config.json`、`server-admin.txt`、`build.local.ps1`、`build/`、`dist/` 和 APK 构建产物。
 
-推送 `v*` 标签会触发 `.github/workflows/release.yml`：从固定地址下载 APK、校验 SHA-256，然后自动创建 GitHub Release。
+推送 `v*` 标签会触发 `.github/workflows/release.yml`：从固定地址下载 APK、校验 SHA-256，然后自动创建 GitHub Release。发布新版本前，先添加对应的 `.github/checksums/vX.Y.Z.sha256` 和 `.github/release-notes-X.Y.Z.md`。
 
 打包（Windows，需要 JDK 17 + Android SDK build-tools 34）：
 
