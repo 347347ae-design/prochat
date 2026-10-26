@@ -195,6 +195,9 @@
     temperature: 0.7,
     maxTokens: 0,
     voiceLang: 'zh-CN',
+    voiceMode: 'api',
+    voiceModel: '',
+    voiceBase: '',
     activeId: '',
     autoUpdate: true,
     lastUpdateCheck: 0,
@@ -897,6 +900,7 @@
     onVoiceStart() {
       voiceOn = true;
       $('#btnMic').classList.add('rec');
+      toast('正在录音，再按一次结束');
     },
     onVoice(text, isFinal) {
       const ta = $('#ta');
@@ -992,20 +996,120 @@
 
   let voiceBase = '';
   let voiceOn = false;
+
+  function savedVoiceKey() {
+    try { return Native.getSecret('voiceKey') || ''; } catch (e) { return ''; }
+  }
+
+  function hostOfUrl(u) {
+    try { return new URL(u).hostname.toLowerCase(); } catch (e) { return ''; }
+  }
+
+  function voiceOptions() {
+    const mode = S.settings.voiceMode === 'system' ? 'system' : 'api';
+    const lang = S.settings.voiceLang || 'zh-CN';
+    if (mode === 'system') return { mode: mode, lang: lang };
+
+    const cfg = activeConfig();
+    const customBase = String(S.settings.voiceBase || '').trim();
+    const base = String(customBase || (cfg && cfg.baseUrl) || '')
+      .trim().replace(/\/+$/, '');
+    const defaultModel = /siliconflow\.cn/i.test(base) ? 'FunAudioLLM/SenseVoiceSmall' : 'whisper-1';
+    const model = String(S.settings.voiceModel || defaultModel).trim();
+    const sameService = !customBase || (!!cfg && hostOfUrl(cfg.baseUrl) === hostOfUrl(base));
+    const apiKey = savedVoiceKey() || (sameService && cfg ? secretOf(cfg.id) : '');
+    if (!base) {
+      toast('先到设置 → 语音输入里填转写接口');
+      openSettings();
+      return null;
+    }
+    if (!model) {
+      toast('先填语音转写模型');
+      openSettings();
+      return null;
+    }
+    if (!apiKey && !isLocalUrl(base)) {
+      toast(sameService ? '语音转写还没填 API Key' : '换用其他转写服务时，要单独填转写 Key');
+      openSettings();
+      return null;
+    }
+    return {
+      mode: mode,
+      baseUrl: base,
+      apiKey: apiKey,
+      model: model,
+      lang: lang,
+      headers: sameService && cfg && cfg.headers ? cfg.headers : null
+    };
+  }
+
   $('#btnMic').addEventListener('click', () => {
     if (voiceOn) {
       voiceOn = false;
       $('#btnMic').classList.remove('rec');
-      try { Native.stopVoice(); } catch (e) {}
       voiceBase = '';
+      try { Native.stopVoice(); } catch (e) {}
       return;
     }
+    const opts = voiceOptions();
+    if (!opts) return;
     voiceOn = true;
     voiceBase = ta.value;
-    const lang = S.settings.voiceLang || 'zh-CN';
-    try { Native.startVoice(lang); } catch (e) { voiceOn = false; toast('语音不可用'); }
+    $('#btnMic').classList.add('rec');
+    try {
+      Native.startVoice(JSON.stringify(opts));
+    } catch (e) {
+      voiceOn = false;
+      $('#btnMic').classList.remove('rec');
+      toast('语音启动失败');
+    }
     setTimeout(() => { voiceOn = false; $('#btnMic').classList.remove('rec'); }, 120000);
   });
+
+  // 屏幕左右边缘向内滑动：关闭当前面板 / 返回上一页。
+  // 系统手势导航本身也会触发返回，这里主要兼容三键导航和网页版。
+  (function setupEdgeSwipeBack() {
+    const EDGE = 24;
+    const DIST = 70;
+    const SLOP = 50;
+    let startX = 0, startY = 0, edge = 0, tracking = false;
+
+    document.addEventListener('touchstart', (e) => {
+      if (e.touches.length !== 1) return;
+      const t = e.touches[0];
+      const w = window.innerWidth;
+      if (t.clientX <= EDGE) edge = -1;
+      else if (t.clientX >= w - EDGE) edge = 1;
+      else { edge = 0; tracking = false; return; }
+      const target = e.target;
+      if (target && target.closest && target.closest('input,textarea,select,[contenteditable="true"]')) {
+        edge = 0;
+        tracking = false;
+        return;
+      }
+      startX = t.clientX;
+      startY = t.clientY;
+      tracking = true;
+    }, { passive: true });
+
+    document.addEventListener('touchmove', (e) => {
+      if (!tracking || e.touches.length !== 1) return;
+      const t = e.touches[0];
+      const dx = t.clientX - startX;
+      const dy = t.clientY - startY;
+      if (Math.abs(dy) > SLOP) { tracking = false; return; }
+      if ((edge < 0 && dx > DIST) || (edge > 0 && dx < -DIST)) {
+        tracking = false;
+        edge = 0;
+        closeTop();
+      }
+    }, { passive: true });
+
+    document.addEventListener('touchend', () => {
+      tracking = false;
+      edge = 0;
+    }, { passive: true });
+  })();
 
   $('#attachBox').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-rm]');
@@ -1218,6 +1322,16 @@
 
   // 当前版本更新公告。升级后第一次打开显示一次；设置里也可以手动重看。
   const RELEASE_NOTICES = {
+    '1.2.5': {
+      title: 'ProChat 1.2.5 更新公告',
+      date: '2026-10-26',
+      notes: [
+        '• 语音输入默认改为接口转写，不再依赖谷歌语音服务。',
+        '• 支持硅基流动 SenseVoice、OpenAI Whisper 等兼容接口。',
+        '• 屏幕左右边缘向内滑动，可以返回上一页。',
+        '• 1.2.4 的更新公告、打赏和图片上传保持不变。'
+      ].join('\n')
+    },
     '1.2.4': {
       title: 'ProChat 1.2.4 更新公告',
       date: '2026-10-26',
@@ -1551,14 +1665,63 @@
     $('#setTemp').value = S.settings.temperature;
     $('#tempVal').textContent = Number(S.settings.temperature).toFixed(1);
     $('#setLang').value = S.settings.voiceLang || 'zh-CN';
+    $('#setVoiceMode').value = S.settings.voiceMode === 'system' ? 'system' : 'api';
+    $('#setVoiceModel').value = S.settings.voiceModel || '';
+    $('#setVoiceBase').value = S.settings.voiceBase || '';
+    $('#setVoiceKey').value = '';
+    $('#setVoiceKey').placeholder = savedVoiceKey()
+      ? '已保存，留空继续使用' : '同服务可留空，否则请填转写 Key';
+    toggleVoiceApiBox();
     $('#setAutoUpdate').checked = S.settings.autoUpdate !== false;
     $('#setApiBase').value = S.settings.apiBase || DEFAULT_API_BASE;
     $$('#themeSeg button').forEach(b => b.classList.toggle('on', b.dataset.v === S.settings.theme));
     const info = appInfoSafe();
     $('#aboutText').textContent = 'ProChat ' + (info.version || '?') + ' · ' + (info.model || '')
-      + (info.speech ? ' · 语音可用' : ' · 未检测到语音服务');
+      + ' · 语音：' + (S.settings.voiceMode === 'system' ? '系统识别' : '接口转写');
     refreshUpdateStatus();
   }
+
+  function toggleVoiceApiBox() {
+    const sys = S.settings.voiceMode === 'system';
+    $('#voiceApiBox').classList.toggle('hidden', sys);
+  }
+
+  $('#setVoiceMode').addEventListener('change', (e) => {
+    S.settings.voiceMode = e.target.value === 'system' ? 'system' : 'api';
+    saveSettings();
+    toggleVoiceApiBox();
+  });
+  $('#setVoiceModel').addEventListener('input', (e) => {
+    S.settings.voiceModel = e.target.value.trim();
+    saveSettings();
+  });
+  $('#setVoiceBase').addEventListener('input', (e) => {
+    S.settings.voiceBase = e.target.value.trim();
+    saveSettings();
+  });
+  $('#setVoiceKey').addEventListener('change', (e) => {
+    const v = e.target.value.trim();
+    if (!v) return;
+    try {
+      Native.setSecret('voiceKey', v);
+      e.target.value = '';
+      e.target.placeholder = '已保存，留空继续使用';
+      toast('语音转写 Key 已保存');
+    } catch (err) {
+      toast('保存失败');
+    }
+  });
+  $('#btnVoicePreset').addEventListener('click', () => {
+    S.settings.voiceMode = 'api';
+    S.settings.voiceBase = 'https://api.siliconflow.cn/v1';
+    S.settings.voiceModel = 'FunAudioLLM/SenseVoiceSmall';
+    saveSettings();
+    $('#setVoiceMode').value = 'api';
+    $('#setVoiceBase').value = S.settings.voiceBase;
+    $('#setVoiceModel').value = S.settings.voiceModel;
+    toggleVoiceApiBox();
+    toast('已填入硅基流动示例；如果当前不是硅基流动，请在下面单独填转写 Key');
+  });
 
   $('#setSys').addEventListener('input', (e) => { S.settings.systemPrompt = e.target.value; saveSettings(); });
   $('#setCtx').addEventListener('change', (e) => {

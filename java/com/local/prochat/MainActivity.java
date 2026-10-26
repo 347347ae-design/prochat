@@ -48,10 +48,12 @@ public class MainActivity extends Activity {
     private static final int REQ_PICK_IMAGE = 1001;
     private static final int REQ_VOICE = 1002;
     private static final int REQ_SAVE_IMAGE = 1003;
+    private static final int REQ_MIC = 1004;
 
     private WebView web;
     private ChatClient chat;
     private NetClient net;
+    private VoiceClient voice;
     private SecretStore secrets;
     private Store store;
     private final Handler ui = new Handler(Looper.getMainLooper());
@@ -59,6 +61,7 @@ public class MainActivity extends Activity {
 
     private String pendingSaveAsset;
     private String pendingSaveName;
+    private String pendingVoiceOpts;
 
     @Override
     protected void onCreate(Bundle b) {
@@ -67,6 +70,7 @@ public class MainActivity extends Activity {
         store = new Store(this);
         chat = new ChatClient(this);
         net = new NetClient(this);
+        voice = new VoiceClient(this);
 
         web = new WebView(this);
         setContentView(web);
@@ -134,6 +138,10 @@ public class MainActivity extends Activity {
     @Override
     protected void onDestroy() {
         chat.shutdown();
+        if (voice != null) {
+            voice.shutdown();
+            voice = null;
+        }
         if (net != null) {
             net.shutdown();
             net = null;
@@ -437,11 +445,34 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface
-        public void startVoice(final String locale) {
+        public void startVoice(final String optsJson) {
             ui.post(new Runnable() {
                 @Override
                 public void run() {
-                    startVoiceInternal(locale);
+                    JSONObject opts;
+                    try {
+                        opts = new JSONObject(optsJson);
+                    } catch (Throwable t) {
+                        // 兼容旧版 JS 只传语言代码的调用
+                        opts = new JSONObject();
+                        try {
+                            opts.put("mode", "system");
+                            opts.put("lang", optsJson == null ? "" : optsJson);
+                        } catch (Throwable ignored) {
+                        }
+                    }
+                    String mode = opts.optString("mode", "api");
+                    if ("system".equals(mode)) {
+                        startVoiceInternal(opts.optString("lang", ""));
+                        return;
+                    }
+                    if (checkSelfPermission(Manifest.permission.RECORD_AUDIO)
+                            != PackageManager.PERMISSION_GRANTED) {
+                        pendingVoiceOpts = opts.toString();
+                        requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, REQ_MIC);
+                        return;
+                    }
+                    startVoiceNow(opts);
                 }
             });
         }
@@ -451,7 +482,12 @@ public class MainActivity extends Activity {
             ui.post(new Runnable() {
                 @Override
                 public void run() {
-                    callJs("onVoiceEnd");
+                    if (pendingVoiceOpts != null) {
+                        pendingVoiceOpts = null;
+                        callJs("onVoiceEnd");
+                        return;
+                    }
+                    if (voice != null) voice.stop();
                 }
             });
         }
@@ -554,6 +590,14 @@ public class MainActivity extends Activity {
 
     // --------------------------------------------------------------- 语音
 
+    private void startVoiceNow(JSONObject opts) {
+        if (voice == null) {
+            callJs("onVoiceError", JSONObject.quote("语音模块没有初始化"));
+            return;
+        }
+        voice.start(opts);
+    }
+
     private void startVoiceInternal(String locale) {
         try {
             Intent i = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
@@ -625,6 +669,20 @@ public class MainActivity extends Activity {
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] results) {
         super.onRequestPermissionsResult(requestCode, permissions, results);
         boolean granted = results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED;
+        if (requestCode == REQ_MIC) {
+            String opts = pendingVoiceOpts;
+            pendingVoiceOpts = null;
+            if (granted && opts != null) {
+                try {
+                    startVoiceNow(new JSONObject(opts));
+                } catch (Throwable t) {
+                    callJs("onVoiceError", JSONObject.quote("语音启动失败：" + t.getMessage()));
+                }
+            } else {
+                callJs("onVoiceError", JSONObject.quote("没有麦克风权限，无法录音"));
+            }
+            return;
+        }
         if (requestCode == REQ_SAVE_IMAGE) {
             String asset = pendingSaveAsset;
             String name = pendingSaveName;

@@ -114,20 +114,47 @@
     </div>
 
     <div class="section">
+      <div class="section-title">语音输入</div>
+      <label class="field">
+        <span>识别方式</span>
+        <select id="setVoiceMode">
+          <option value="api">接口转写（推荐，国内可用）</option>
+          <option value="system">系统语音（可能调用谷歌）</option>
+        </select>
+      </label>
+      <div id="voiceApiBox">
+        <label class="field">
+          <span>转写模型</span>
+          <input id="setVoiceModel" type="text" placeholder="whisper-1 / FunAudioLLM/SenseVoiceSmall" autocapitalize="off" spellcheck="false">
+        </label>
+        <label class="field">
+          <span>转写接口地址 <em class="dim">Base URL</em></span>
+          <input id="setVoiceBase" type="url" placeholder="留空则用当前模型服务" autocapitalize="off" spellcheck="false">
+        </label>
+        <label class="field">
+          <span>转写 API Key</span>
+          <input id="setVoiceKey" type="password" placeholder="同服务可留空，否则请填转写 Key" autocapitalize="off" spellcheck="false">
+        </label>
+        <p class="note">录音会直接发送到你填写的转写接口，不经过 ProChat 服务器。转写 Key 留空时，只有和当前模型服务同域名才会复用当前 Key。硅基流动可用地址 <code>https://api.siliconflow.cn/v1</code>、模型 <code>FunAudioLLM/SenseVoiceSmall</code>。</p>
+        <button class="ghostbtn tiny" id="btnVoicePreset">填入硅基流动示例</button>
+      </div>
+      <label class="field">
+        <span>识别语言</span>
+        <select id="setLang">
+          <option value="auto">自动 / 不传</option>
+          <option value="zh-CN">普通话</option>
+          <option value="en-US">English</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="section">
       <div class="section-title">外观</div>
       <div class="segmented" id="themeSeg">
         <button data-v="auto">跟随系统</button>
         <button data-v="light">浅色</button>
         <button data-v="dark">深色</button>
       </div>
-      <label class="field">
-        <span>语音识别语言</span>
-        <select id="setLang">
-          <option value="auto">跟随系统</option>
-          <option value="zh-CN">普通话</option>
-          <option value="en-US">English</option>
-        </select>
-      </label>
     </div>
 
     <div class="section">

@@ -4,8 +4,10 @@
 没有内置模型、没有中转服务器、没有账号系统——你说的话和模型的回复只在手机和你填的接口之间流动。
 
 GitHub：<https://github.com/347347ae-design/prochat>
-APK：[GitHub Releases v1.2.4](https://github.com/347347ae-design/prochat/releases/tag/v1.2.4)（约 526 KB），或本地构建输出 `dist/ProChat-1.2.4.apk`
+APK：[GitHub Releases v1.2.5](https://github.com/347347ae-design/prochat/releases/tag/v1.2.5)（约 530 KB），或本地构建输出 `dist/ProChat-1.2.5.apk`
 
+> 1.2.5 更新：语音输入默认改为接口转写，不再依赖谷歌语音服务；支持硅基流动 SenseVoice、OpenAI Whisper 等 OpenAI 兼容转写接口。屏幕左右边缘向内滑动可以返回上一页。1.2.4 的更新公告、打赏和图片上传保持不变。
+>
 > 1.2.4 更新：新增「更新公告」弹窗，升级后第一次打开会显示本次更新内容；设置里也可以随时重看。
 >
 > 1.2.3 更新：修复部分国产手机按语音键闪退的问题；语音输入改为调用系统语音识别界面，识别完成后自动填入输入框。打赏、更新检查和图片上传保持不变。
@@ -41,6 +43,19 @@ APK：[GitHub Releases v1.2.4](https://github.com/347347ae-design/prochat/releas
    - 点模型名右边的 **选择** 可以看内置模型，点 **从账号拉取完整列表** 会读你账号下真实可用的模型；
    - 贴上你的 **API Key**，保存。以后可在设置里随时切换或添加多个服务。
 3. 回首页直接发消息。支持流式输出、Markdown 表格、LaTeX 公式、代码块一键复制、思考过程折叠。
+
+### 语音输入（国内可用）
+
+默认不再调用谷歌语音，而是把录音直接发到你填写的 OpenAI 兼容转写接口：
+
+1. 设置 → **语音输入** → 识别方式选 **接口转写**。
+2. 填转写模型和 Base URL；转写 Key 留空时，只有和当前模型服务同域名才会复用当前 Key；换用其他服务请单独填。
+3. 常用配置：
+   - 硅基流动：Base URL `https://api.siliconflow.cn/v1`，模型 `FunAudioLLM/SenseVoiceSmall`，Key 用硅基流动的 Key。
+   - OpenAI：Base URL `https://api.openai.com/v1`，模型 `whisper-1`，Key 用 OpenAI 的 Key（国内网络需自行解决连通性）。
+4. 第一次按麦克风会请求录音权限；再按一次结束并开始识别，文字会填进输入框。
+
+录音只发送到你填写的转写接口，不经过 ProChat 服务器。如果暂时没有转写服务，也可以直接用输入法的麦克风听写；设置里的「系统语音」模式仅作为备用，部分国产手机会调用谷歌服务。
 
 ### 内置的服务商与模型
 
@@ -82,7 +97,8 @@ APK：[GitHub Releases v1.2.4](https://github.com/347347ae-design/prochat/releas
 - 代码块带语言标签 + 一键复制
 - `reasoning_content`（DeepSeek R1 等推理模型）折叠显示「思考过程」
 - 图片上传（多模态模型，最多 4 张，自动压缩到 1280px / JPEG）
-- 语音输入（调用系统语音识别界面，识别完成后填入输入框）
+- 语音输入：默认接口转写（硅基流动 SenseVoice / OpenAI Whisper 等），不依赖谷歌；也可切换系统识别
+- 屏幕左右边缘向内滑动可返回上一页（同时兼容系统手势返回）
 - 系统提示词、上下文条数、温度、最大 tokens 可调
 - 深色 / 浅色 / 跟随系统
 - 回复下方显示耗时、字数、token 用量，可复制 / 重新生成
@@ -117,6 +133,7 @@ prochat/
 │  └─ katex/           离线公式渲染（KaTeX，MIT 协议）
 ├─ java/com/local/prochat/
 │  ├─ MainActivity.java    WebView 宿主 + JS 桥（剪贴板/分享/选图/语音/状态栏）
+│  ├─ VoiceClient.java     录音 + OpenAI 兼容 /audio/transcriptions 转写
 │  ├─ ChatClient.java      OpenAI 兼容接口 + SSE 流式解析（原生网络，无 CORS）
 │  ├─ NetClient.java       检查更新 / 留言板的轻量 HTTP 客户端
 │  ├─ SecretStore.java     Android Keystore 加密存储 API Key
@@ -149,7 +166,7 @@ Copy-Item .\build.local.example.ps1 .\build.local.ps1
 powershell -ExecutionPolicy Bypass -File .\build.ps1
 ```
 
-不依赖 Gradle，所以整个构建几秒钟完成，APK 只有 520 KB 左右（其中约 250 KB 是离线公式字体，约 150 KB 是打赏收款码）。
+不依赖 Gradle，所以整个构建几秒钟完成，APK 只有 530 KB 左右（其中约 250 KB 是离线公式字体，约 150 KB 是打赏收款码）。
 `prochat.jks` 是本次使用的签名文件，**仓库不包含它**；以后升级必须用同一个文件签名，
 否则不能覆盖安装。想换成自己的签名，生成新的 keystore 后重新打包即可。不要把 keystore、口令或 `build.local.ps1` 提交到仓库。
 
@@ -180,7 +197,8 @@ SakuraFrp 隧道名 `prochat`，本机服务 `prochat-sakura`，隧道 ID `29674
 
 - 只支持 OpenAI 兼容的 `/chat/completions`；Claude / Gemini 原生协议不在范围内（可以用它们各自的 OpenAI 兼容层或中转）。
 - 图片上传要模型本身支持视觉，不然接口会报错。
-- 语音识别依赖手机上的系统语音识别界面（Google 语音服务或厂商自带），没有的话按钮会提示不可用。
+- 接口转写需要你有一个支持 `/audio/transcriptions` 的 OpenAI 兼容服务；如果当前模型服务只支持聊天，需要单独配置转写服务，或者用输入法麦克风听写。
+- 系统语音模式仍依赖手机上的系统语音识别界面（部分手机会调用 Google），国内建议使用默认的接口转写。
 - 会话记录不加密（只有 API Key 加密），因为要存图片和长文本；敏感内容建议及时清理。
 - 公式渲染使用本地 KaTeX：遇到不支持的 LaTeX 命令会按原文显示，不会让页面报错。
 - 为避免把价格当成公式，`$...$` 会跳过纯数字、代码块和行内代码里的内容；复杂公式建议写在 `$$...$$` 里。
